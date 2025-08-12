@@ -174,7 +174,8 @@ function App() {
       case '食事':
         icon = '🍽️';
         const amountText = record.amount > 0 ? ` ¥${record.amount.toLocaleString()}` : '';
-        content = `${record.mealType}${amountText} ${record.calories}kcal ${record.mealContent}`;
+        const photoText = record.photos && record.photos.length > 0 ? ` 📷${record.photos.length}枚` : '';
+        content = `${record.mealType}${amountText} ${record.calories}kcal ${record.mealContent}${photoText}`;
         break;
       case '睡眠':
         icon = '😴';
