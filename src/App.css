@@ -610,10 +610,65 @@ input[type="file"] {
   font-weight: bold;
 }
 
+./* カロリー設定のスタイル */
+.calories-settings {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.calories-settings h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.calories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.calorie-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calorie-item label {
+  font-weight: bold;
+  color: #555;
+  font-size: 14px;
+}
+
+.calorie-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calorie-input input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.calorie-input span {
+  color: #666;
+  font-size: 14px;
+  font-weight: bold;
+}
+
 .blood-pressure-inputs {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .blood-pressure-inputs input {
@@ -625,12 +680,14 @@ input[type="file"] {
   font-size: 18px;
   font-weight: bold;
   color: #666;
+  margin: 0 5px;
 }
 
 .unit {
   font-size: 14px;
   color: #666;
   margin-left: 5px;
+  white-space: nowrap;
 }
 
 /* 運動記録専用スタイル */
