@@ -50,10 +50,34 @@ function MealRecord({ onBack, onSave, editingRecord }) {
       try {
         const caloriesDoc = await getDoc(doc(db, 'settings', 'defaultCalories'));
         if (caloriesDoc.exists()) {
-          setDefaultCalories(caloriesDoc.data());
+          const loadedCalories = caloriesDoc.data();
+          // 既存のdefaultCaloriesと新しいデータをマージ
+          const newDefaultCalories = {
+            '朝食': loadedCalories['朝食'] || 500,
+            '昼食': loadedCalories['昼食'] || 700,
+            '夕食': loadedCalories['夕食'] || 600,
+            '間食': loadedCalories['間食'] || 200
+          };
+          // useStateは使わずに、保存時に参照できるよう変数で管理
+          window.currentDefaultCalories = newDefaultCalories;
+        } else {
+          // デフォルト値を設定
+          window.currentDefaultCalories = {
+            '朝食': 500,
+            '昼食': 700,
+            '夕食': 600,
+            '間食': 200
+          };
         }
       } catch (error) {
         console.error('デフォルトカロリー読み込みエラー:', error);
+        // エラー時はデフォルト値を設定
+        window.currentDefaultCalories = {
+          '朝食': 500,
+          '昼食': 700,
+          '夕食': 600,
+          '間食': 200
+        };
       }
     };
     loadDefaultCalories();
@@ -229,7 +253,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
     }
 
     try {
-      const finalCalories = useDefault ? defaultCalories[mealType] : parseInt(calories) || 0;
+      const finalCalories = useDefault ? getDefaultCalories()[mealType] : parseInt(calories) || 0;
       
       const mealData = {
         category: '食事',
@@ -344,7 +368,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
                 onChange={(e) => setUseDefault(e.target.checked)}
               />
               <label htmlFor="useDefault">
-                デフォルト値使用 ({defaultCalories[mealType]}kcal)
+                デフォルト値使用 ({getDefaultCalories()[mealType]}kcal)
               </label>
             </div>
           </div>
