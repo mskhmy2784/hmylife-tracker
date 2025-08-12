@@ -598,3 +598,45 @@ input:checked + .slider:before {
     flex-direction: column;
   }
 }
+
+/* 写真関連のスタイル */
+.photo-section {
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.photos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.photo-item {
+  position: relative;
+  display: inline-block;
+}
+
+.photo-delete-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.photo-delete-btn:hover {
+  background: #cc0000;
+}
+
+input[type="file"] {
+  margin-bottom: 10px;
+}
