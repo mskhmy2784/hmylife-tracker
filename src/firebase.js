@@ -1,0 +1,14 @@
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBHqDwddHDwmLHQe9WGEl6Kz2Luz1lDnBo",
+  authDomain: "hmylife-tracker.firebaseapp.com",
+  projectId: "hmylife-tracker",
+  storageBucket: "hmylife-tracker.appspot.com",
+  messagingSenderId: "856708406938",
+  appId: "1:856708406938:web:c1833966718d35784d4923"
+};
+
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
