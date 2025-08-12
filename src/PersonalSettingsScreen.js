@@ -88,17 +88,17 @@ function PersonalSettingsScreen({ onBack }) {
   };
 
   // データ削除統計の取得
-  const getDeleteStats = async (fromDate) => {
-    if (!fromDate) return null;
+  const getDeleteStats = async (toDate) => {
+    if (!toDate) return null;
 
     try {
-      const targetDate = new Date(fromDate);
+      const targetDate = new Date(toDate);
       const targetDateString = targetDate.toDateString();
       
-      // 指定日付以降のレコードを検索
+      // 指定日付以前のレコードを検索
       const q = query(
         collection(db, 'records'),
-        where('date', '>=', targetDateString)
+        where('date', '<=', targetDateString)
       );
       
       const querySnapshot = await getDocs(q);
@@ -118,8 +118,8 @@ function PersonalSettingsScreen({ onBack }) {
         totalCount: records.length,
         categoryStats,
         dateRange: {
-          from: fromDate,
-          to: new Date().toISOString().split('T')[0]
+          from: records.length > 0 ? records.map(r => r.date).sort()[0] : toDate,
+          to: toDate
         }
       };
     } catch (error) {
@@ -137,10 +137,10 @@ function PersonalSettingsScreen({ onBack }) {
     }
   }, [deleteDate]);
 
-  // 特定日付以降のデータ削除
-  const handleDeleteDataFromDate = async () => {
+  // 特定日付以前のデータ削除
+  const handleDeleteDataToDate = async () => {
     if (!deleteDate) {
-      alert('削除開始日を選択してください');
+      alert('削除終了日を選択してください');
       return;
     }
 
@@ -150,7 +150,7 @@ function PersonalSettingsScreen({ onBack }) {
       return;
     }
 
-    const confirmMessage = `${deleteDate}以降のデータ（${stats.totalCount}件）を削除しますか？\n\nこの操作は元に戻せません。`;
+    const confirmMessage = `${deleteDate}以前のデータ（${stats.totalCount}件）を削除しますか？\n\nこの操作は元に戻せません。`;
     
     if (!window.confirm(confirmMessage)) return;
 
@@ -174,7 +174,7 @@ function PersonalSettingsScreen({ onBack }) {
       // 削除対象のレコードを取得
       const q = query(
         collection(db, 'records'),
-        where('date', '>=', targetDateString)
+        where('date', '<=', targetDateString)
       );
       
       const querySnapshot = await getDocs(q);
@@ -480,13 +480,13 @@ function PersonalSettingsScreen({ onBack }) {
           <h3>🗑️ データ管理</h3>
           
           <div className="form-group">
-            <label>特定日付以降のデータを削除:</label>
+            <label>特定日付以前のデータを削除:</label>
             <div className="delete-date-section">
               <input
                 type="date"
                 value={deleteDate}
                 onChange={(e) => setDeleteDate(e.target.value)}
-                placeholder="削除開始日を選択"
+                placeholder="削除終了日を選択"
                 max={new Date().toISOString().split('T')[0]}
               />
               
@@ -511,10 +511,10 @@ function PersonalSettingsScreen({ onBack }) {
               
               <button 
                 className="delete-data-btn"
-                onClick={handleDeleteDataFromDate}
+                onClick={handleDeleteDataToDate}
                 disabled={!deleteDate || isDeleting || !deleteStats || deleteStats.totalCount === 0}
               >
-                {isDeleting ? '削除中...' : '指定日以降のデータを削除'}
+                {isDeleting ? '削除中...' : '指定日以前のデータを削除'}
               </button>
               
               <div className="delete-warning">
