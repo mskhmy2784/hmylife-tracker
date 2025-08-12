@@ -59,6 +59,7 @@ function SettingsScreen({ onBack }) {
       case 'exercise': setExerciseTypes(data); break;
       case 'locations': setLocations(data); break;
       case 'transport': setTransportMethods(data); break;
+      default: setStores(data); break;
     }
   };
 
@@ -94,7 +95,7 @@ function SettingsScreen({ onBack }) {
     );
 
     return () => unsubscribe();
-  }, [activeTab]);
+  }, [activeTab, getCurrentCollection, setCurrentData]);
 
   // アイテム追加
   const handleAddItem = async () => {
