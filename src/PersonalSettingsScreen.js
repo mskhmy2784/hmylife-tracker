@@ -39,6 +39,12 @@ function PersonalSettingsScreen({ onBack }) {
   const [deleteDate, setDeleteDate] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteStats, setDeleteStats] = useState(null);
+  
+  // エクスポート関連
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportStats, setExportStats] = useState(null);
 
   const personalSettingsDocId = 'user_personal_settings';
 
@@ -87,7 +93,210 @@ function PersonalSettingsScreen({ onBack }) {
     return Math.round(bmr * (activityMultiplier[activityLevel] || 1.375));
   };
 
-  // データ削除統計の取得
+  // エクスポート統計の取得
+  const getExportStats = async (startDate, endDate) => {
+    if (!startDate || !endDate) return null;
+
+    try {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (start > end) {
+        return { error: '開始日は終了日より前に設定してください' };
+      }
+      
+      const startDateString = start.toDateString();
+      const endDateString = end.toDateString();
+      
+      // 期間内のレコードを検索
+      const q = query(
+        collection(db, 'records'),
+        where('date', '>=', startDateString),
+        where('date', '<=', endDateString)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const records = [];
+      querySnapshot.forEach((doc) => {
+        records.push({ id: doc.id, ...doc.data() });
+      });
+
+      // カテゴリ別の統計を計算
+      const categoryStats = {};
+      records.forEach(record => {
+        const category = record.category || '未分類';
+        categoryStats[category] = (categoryStats[category] || 0) + 1;
+      });
+
+      return {
+        totalCount: records.length,
+        categoryStats,
+        dateRange: {
+          from: startDate,
+          to: endDate
+        }
+      };
+    } catch (error) {
+      console.error('エクスポート統計取得エラー:', error);
+      return { error: 'データの取得に失敗しました' };
+    }
+  };
+
+  // CSVエクスポート機能
+  const handleExportToCsv = async () => {
+    if (!exportStartDate || !exportEndDate) {
+      alert('エクスポート期間を選択してください');
+      return;
+    }
+
+    const stats = await getExportStats(exportStartDate, exportEndDate);
+    if (!stats) return;
+    
+    if (stats.error) {
+      alert(stats.error);
+      return;
+    }
+    
+    if (stats.totalCount === 0) {
+      alert('エクスポート対象のデータがありません');
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const start = new Date(exportStartDate);
+      const end = new Date(exportEndDate);
+      const startDateString = start.toDateString();
+      const endDateString = end.toDateString();
+      
+      // エクスポート対象のレコードを取得
+      const q = query(
+        collection(db, 'records'),
+        where('date', '>=', startDateString),
+        where('date', '<=', endDateString)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const records = [];
+      querySnapshot.forEach((doc) => {
+        records.push({ id: doc.id, ...doc.data() });
+      });
+
+      if (records.length === 0) {
+        alert('エクスポート対象のデータがありません');
+        return;
+      }
+
+      // データを日付・時刻順でソート
+      records.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateA.getTime() - dateB.getTime();
+        }
+        
+        const timeA = a.recordTime || a.wakeTime || a.startTime || '00:00';
+        const timeB = b.recordTime || b.wakeTime || b.startTime || '00:00';
+        return timeA.localeCompare(timeB);
+      });
+
+      // CSV用のヘッダーを定義
+      const csvHeaders = [
+        'ID',
+        '日付',
+        '時刻',
+        'カテゴリ',
+        '詳細タイプ',
+        '内容',
+        '数値1',
+        '数値2',
+        '数値3',
+        '場所',
+        '支払方法',
+        '重要度',
+        '完了状況',
+        '緯度',
+        '経度',
+        '住所',
+        'メモ',
+        '作成日時',
+        '更新日時'
+      ];
+
+      // CSV用のデータを変換
+      const csvData = records.map(record => {
+        const formatDate = (date) => {
+          if (!date) return '';
+          if (date.toDate) return date.toDate().toISOString();
+          if (date instanceof Date) return date.toISOString();
+          return date;
+        };
+
+        return [
+          record.id || '',
+          record.date || '',
+          record.recordTime || record.wakeTime || record.startTime || '',
+          record.category || '',
+          record.mealType || record.exerciseType || record.transportMethod || record.infoType || '',
+          record.mealContent || record.exerciseContent || record.expenseContent || record.infoContent || '',
+          record.calories || record.amount || record.weight || record.caloriesBurned || record.sleepHours || '',
+          record.sleepMinutes || record.duration || record.distance || record.bodyFatRate || record.bloodPressureHigh || '',
+          record.bmi || record.bloodPressureLow || record.waistSize || record.reps || record.durationMinutes || '',
+          record.paymentLocation || record.exerciseLocation || record.fromLocation || record.toLocation || '',
+          record.paymentMethod || '',
+          record.priority || '',
+          record.isCompleted ? '完了' : '未完了',
+          record.location?.latitude || '',
+          record.location?.longitude || '',
+          record.location?.address?.fullAddress || '',
+          record.memo || '',
+          formatDate(record.createdAt),
+          formatDate(record.updatedAt)
+        ];
+      });
+
+      // CSV文字列を作成
+      const csvContent = [
+        csvHeaders.join(','),
+        ...csvData.map(row => 
+          row.map(field => {
+            // フィールドにカンマや改行が含まれる場合はダブルクォートで囲む
+            const fieldStr = String(field || '');
+            if (fieldStr.includes(',') || fieldStr.includes('\n') || fieldStr.includes('"')) {
+              return `"${fieldStr.replace(/"/g, '""')}"`;
+            }
+            return fieldStr;
+          }).join(',')
+        )
+      ].join('\n');
+
+      // BOMを追加してUTF-8エンコーディングを明示
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+      
+      // ダウンロード用のリンクを作成
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      
+      const fileName = `life_tracker_${exportStartDate}_to_${exportEndDate}.csv`;
+      link.setAttribute('download', fileName);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert(`${records.length}件のデータをCSVファイルとしてダウンロードしました`);
+
+    } catch (error) {
+      console.error('CSVエクスポートエラー:', error);
+      alert('CSVエクスポートに失敗しました: ' + error.message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
   const getDeleteStats = async (toDate) => {
     if (!toDate) return null;
 
@@ -127,6 +336,15 @@ function PersonalSettingsScreen({ onBack }) {
       return null;
     }
   };
+
+  // エクスポートプレビューの更新
+  useEffect(() => {
+    if (exportStartDate && exportEndDate) {
+      getExportStats(exportStartDate, exportEndDate).then(setExportStats);
+    } else {
+      setExportStats(null);
+    }
+  }, [exportStartDate, exportEndDate]);
 
   // 削除プレビューの更新
   useEffect(() => {
@@ -479,6 +697,72 @@ function PersonalSettingsScreen({ onBack }) {
         <div className="settings-section">
           <h3>🗑️ データ管理</h3>
           
+          {/* CSVエクスポート */}
+          <div className="form-group">
+            <label>CSVエクスポート:</label>
+            <div className="export-section">
+              <div className="date-range-inputs">
+                <div className="date-input-group">
+                  <label>開始日:</label>
+                  <input
+                    type="date"
+                    value={exportStartDate}
+                    onChange={(e) => setExportStartDate(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                <div className="date-input-group">
+                  <label>終了日:</label>
+                  <input
+                    type="date"
+                    value={exportEndDate}
+                    onChange={(e) => setExportEndDate(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                    min={exportStartDate}
+                  />
+                </div>
+              </div>
+              
+              {exportStats && !exportStats.error && (
+                <div className="export-preview">
+                  <h4>エクスポートプレビュー</h4>
+                  <p><strong>対象期間:</strong> {exportStats.dateRange.from} 〜 {exportStats.dateRange.to}</p>
+                  <p><strong>エクスポート件数:</strong> {exportStats.totalCount}件</p>
+                  
+                  {Object.keys(exportStats.categoryStats).length > 0 && (
+                    <div className="category-breakdown">
+                      <strong>カテゴリ別内訳:</strong>
+                      <ul>
+                        {Object.entries(exportStats.categoryStats).map(([category, count]) => (
+                          <li key={category}>{category}: {count}件</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {exportStats && exportStats.error && (
+                <div className="export-error">
+                  ❌ {exportStats.error}
+                </div>
+              )}
+              
+              <button 
+                className="export-btn"
+                onClick={handleExportToCsv}
+                disabled={!exportStartDate || !exportEndDate || isExporting || !exportStats || exportStats.error || exportStats.totalCount === 0}
+              >
+                {isExporting ? 'エクスポート中...' : 'CSVファイルをダウンロード'}
+              </button>
+              
+              <div className="export-info">
+                💡 エクスポートされたCSVファイルはExcelなどで開くことができます
+              </div>
+            </div>
+          </div>
+
+          {/* データ削除 */}
           <div className="form-group">
             <label>特定日付以前のデータを削除:</label>
             <div className="delete-date-section">
