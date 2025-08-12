@@ -16,7 +16,7 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
   const [isCustomPaymentLocation, setIsCustomPaymentLocation] = useState(false);
   const [expenseContent, setExpenseContent] = useState('');
   const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('現金');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [memo, setMemo] = useState('');
   
@@ -79,6 +79,13 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
       unsubscribePaymentMethods();
     };
   }, []);
+
+  // 支払方法の初期値設定
+  useEffect(() => {
+    if (paymentMethods.length > 0 && !paymentMethod && !editingRecord) {
+      setPaymentMethod(paymentMethods[0]);
+    }
+  }, [paymentMethods, paymentMethod, editingRecord]);
 
   // 編集時のデータ初期化
   useEffect(() => {
