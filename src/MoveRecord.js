@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  orderBy, 
+  onSnapshot 
+} from 'firebase/firestore';
 
 function MoveRecord({ onBack, onSave, editingRecord }) {
   const [startTime, setStartTime] = useState(() => {
@@ -29,13 +38,25 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
   const [memo, setMemo] = useState('');
   const [errors, setErrors] = useState({});
 
-  // マスタデータの状態
-  const [locations, setLocations] = useState([]);
-  const [paymentLocations, setPaymentLocations] = useState([]);
-  const [paymentMethods, setPaymentMethods] = useState([]);
+  // マスタデータ
+  const [masterLocations, setMasterLocations] = useState([]);
+  const [masterTransportMethods, setMasterTransportMethods] = useState([]);
+  const [masterStores, setMasterStores] = useState([]);
+  const [loadingMasterData, setLoadingMasterData] = useState(true);
 
-  // 移動手段のマスタデータ（固定値）
-  const transportMethods = [
+  // フォールバック用データ
+  const fallbackLocations = [
+    '自宅',
+    '職場',
+    '最寄り駅',
+    '新宿駅',
+    '渋谷駅',
+    '東京駅',
+    'スーパー',
+    'ジム'
+  ];
+
+  const fallbackTransportMethods = [
     '徒歩',
     '電車',
     'バス',
@@ -46,76 +67,95 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
     'その他'
   ];
 
-  // マスタデータの読み込み
+  const fallbackStores = [
+    'JR東日本',
+    '東京メトロ',
+    '都営地下鉄',
+    '東急電鉄',
+    '小田急電鉄',
+    '京王電鉄',
+    'バス会社'
+  ];
+
+  // マスタデータ読み込み
   useEffect(() => {
-    // 場所の読み込み
-    const unsubscribeLocations = onSnapshot(
-      query(collection(db, 'masterData', 'locations', 'items'), orderBy('name')),
-      (snapshot) => {
-        const items = snapshot.docs.map(doc => doc.data().name);
-        setLocations(items);
+    let loadedCount = 0;
+    const totalCollections = 3;
+
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= totalCollections) {
+        setLoadingMasterData(false);
+      }
+    };
+
+    // 場所のマスタデータ
+    const locationsQuery = query(
+      collection(db, 'master_locations'),
+      orderBy('order', 'asc')
+    );
+
+    const unsubscribeLocations = onSnapshot(locationsQuery, 
+      (querySnapshot) => {
+        const locations = [];
+        querySnapshot.forEach((doc) => {
+          locations.push({ id: doc.id, ...doc.data() });
+        });
+        setMasterLocations(locations);
+        checkAllLoaded();
       },
       (error) => {
-        console.error('場所マスタ読み込みエラー:', error);
-        // エラー時はデフォルト値を使用
-        setLocations([
-          '自宅',
-          '職場',
-          '最寄り駅',
-          '新宿駅',
-          '渋谷駅',
-          '東京駅',
-          'スーパー',
-          'ジム'
-        ]);
+        console.error('場所マスタデータ取得エラー:', error);
+        checkAllLoaded();
       }
     );
 
-    // 支払先の読み込み（交通費支払い用）
-    const unsubscribePaymentLocations = onSnapshot(
-      query(collection(db, 'masterData', 'paymentLocations', 'items'), orderBy('name')),
-      (snapshot) => {
-        const items = snapshot.docs.map(doc => doc.data().name);
-        setPaymentLocations(items);
+    // 交通手段のマスタデータ
+    const transportQuery = query(
+      collection(db, 'master_transport_methods'),
+      orderBy('order', 'asc')
+    );
+
+    const unsubscribeTransport = onSnapshot(transportQuery, 
+      (querySnapshot) => {
+        const methods = [];
+        querySnapshot.forEach((doc) => {
+          methods.push({ id: doc.id, ...doc.data() });
+        });
+        setMasterTransportMethods(methods);
+        checkAllLoaded();
       },
       (error) => {
-        console.error('支払先マスタ読み込みエラー:', error);
-        // エラー時はデフォルト値を使用
-        setPaymentLocations([
-          'JR東日本',
-          '東京メトロ',
-          '都営地下鉄',
-          '東急電鉄',
-          '小田急電鉄',
-          '京王電鉄',
-          'バス会社'
-        ]);
+        console.error('交通手段マスタデータ取得エラー:', error);
+        checkAllLoaded();
       }
     );
 
-    // 支払方法の読み込み
-    const unsubscribePaymentMethods = onSnapshot(
-      query(collection(db, 'masterData', 'paymentMethods', 'items'), orderBy('name')),
-      (snapshot) => {
-        const items = snapshot.docs.map(doc => doc.data().name);
-        setPaymentMethods(items);
+    // 店舗のマスタデータ（支払先用）
+    const storesQuery = query(
+      collection(db, 'master_stores'),
+      orderBy('order', 'asc')
+    );
+
+    const unsubscribeStores = onSnapshot(storesQuery, 
+      (querySnapshot) => {
+        const stores = [];
+        querySnapshot.forEach((doc) => {
+          stores.push({ id: doc.id, ...doc.data() });
+        });
+        setMasterStores(stores);
+        checkAllLoaded();
       },
       (error) => {
-        console.error('支払方法マスタ読み込みエラー:', error);
-        // エラー時はデフォルト値を使用
-        setPaymentMethods([
-          '交通系IC',
-          '現金',
-          'クレジットカード',
-          'その他'
-        ]);
+        console.error('店舗マスタデータ取得エラー:', error);
+        checkAllLoaded();
       }
     );
 
     return () => {
       unsubscribeLocations();
-      unsubscribePaymentLocations();
-      unsubscribePaymentMethods();
+      unsubscribeTransport();
+      unsubscribeStores();
     };
   }, []);
 
@@ -174,75 +214,17 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
 
   const duration = calculateDuration();
 
-  // バリデーション
-  const validateForm = () => {
-    const newErrors = {};
-
-    // 開始時刻チェック
-    if (!startTime) {
-      newErrors.startTime = '開始時刻を入力してください';
-    }
-
-    // 時刻の論理チェック（両方入力されている場合のみ）
-    if (startTime && endTime && duration.minutes <= 0) {
-      newErrors.timeLogic = '終了時刻は開始時刻より後の時刻を入力してください';
-    }
-
-    // 移動時間の妥当性チェック（両方入力されている場合のみ）
-    if (startTime && endTime && duration.minutes > 24 * 60) {
-      newErrors.timeLogic = '移動時間は24時間以下にしてください';
-    }
-
-    // 移動元チェック
-    const finalFromLocation = isCustomFromLocation ? fromLocationInput : fromLocation;
-    if (!finalFromLocation.trim()) {
-      newErrors.fromLocation = '移動元を入力してください';
-    }
-
-    // 移動先チェック
-    const finalToLocation = isCustomToLocation ? toLocationInput : toLocation;
-    if (!finalToLocation.trim()) {
-      newErrors.toLocation = '移動先を入力してください';
-    }
-
-    // 消費カロリーチェック
-    if (caloriesBurned && parseInt(caloriesBurned) < 0) {
-      newErrors.caloriesBurned = '消費カロリーは0以上で入力してください';
-    }
-
-    // 交通費支払いチェック
-    if (hasPayment) {
-      const finalPaymentLocation = isCustomPaymentLocation ? paymentLocationInput : paymentLocation;
-      if (!finalPaymentLocation.trim()) {
-        newErrors.paymentLocation = '交通費支払時は支払先を入力してください';
-      }
-      
-      const amountNum = parseInt(amount);
-      if (!amount || amountNum < 1) {
-        newErrors.amount = '交通費支払時は金額を1円以上で入力してください';
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   // 保存処理
   const handleSave = async () => {
-    if (!validateForm()) {
-      alert('入力内容に不備があります。エラーメッセージを確認してください。');
-      return;
-    }
-
     try {
       const moveData = {
         category: '移動',
         startTime: startTime,
         endTime: endTime,
-        durationMinutes: duration.minutes,
         fromLocation: isCustomFromLocation ? fromLocationInput : fromLocation,
         toLocation: isCustomToLocation ? toLocationInput : toLocation,
         transportMethod: transportMethod,
+        durationMinutes: duration.minutes,
         caloriesBurned: parseInt(caloriesBurned) || null,
         hasPayment: hasPayment,
         paymentLocation: hasPayment ? (isCustomPaymentLocation ? paymentLocationInput : paymentLocation) : '',
@@ -251,17 +233,16 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
         useLocationInfo: useLocationInfo,
         memo: memo,
         createdAt: editingRecord ? editingRecord.createdAt : new Date(),
+        updatedAt: new Date(),
         date: new Date().toDateString()
       };
 
       if (editingRecord) {
         await updateDoc(doc(db, 'records', editingRecord.id), moveData);
-        alert('移動記録を更新しました！');
       } else {
         await addDoc(collection(db, 'records'), moveData);
-        alert('移動記録を保存しました！');
       }
-      
+
       onSave();
     } catch (error) {
       console.error('保存エラー:', error);
@@ -271,45 +252,60 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
 
   // 削除処理
   const handleDelete = async () => {
-    if (!editingRecord) return;
-    
-    const confirmDelete = window.confirm('この記録を削除しますか？');
-    if (!confirmDelete) return;
-
-    try {
-      await deleteDoc(doc(db, 'records', editingRecord.id));
-      alert('移動記録を削除しました');
-      onSave();
-    } catch (error) {
-      console.error('削除エラー:', error);
-      alert('削除に失敗しました');
+    if (window.confirm('この記録を削除しますか？')) {
+      try {
+        await deleteDoc(doc(db, 'records', editingRecord.id));
+        onBack();
+      } catch (error) {
+        console.error('削除エラー:', error);
+        alert('削除に失敗しました');
+      }
     }
   };
 
+  // 使用するデータを決定
+  const getLocationOptions = () => {
+    if (masterLocations.length > 0) {
+      return masterLocations.map(location => location.name);
+    }
+    return fallbackLocations;
+  };
+
+  const getTransportMethodOptions = () => {
+    if (masterTransportMethods.length > 0) {
+      return masterTransportMethods.map(method => method.name);
+    }
+    return fallbackTransportMethods;
+  };
+
+  const getStoreOptions = () => {
+    if (masterStores.length > 0) {
+      return masterStores.map(store => store.name);
+    }
+    return fallbackStores;
+  };
+
+  const locationOptions = getLocationOptions();
+  const transportMethodOptions = getTransportMethodOptions();
+  const storeOptions = getStoreOptions();
+
   return (
-    <div className="move-record">
+    <div className="record-screen">
       <div className="record-header">
-        <button className="back-btn" onClick={onBack}>←</button>
+        <button className="back-btn" onClick={onBack}>← 戻る</button>
         <h2>{editingRecord ? '移動記録編集' : '移動記録'}</h2>
         <button className="save-btn" onClick={handleSave}>保存</button>
       </div>
 
       <div className="record-form">
-        {/* 開始・終了時刻 */}
+        {/* 時刻設定 */}
         <div className="form-group">
-          <label>開始時刻: <span className="required">*</span></label>
+          <label>開始時刻:</label>
           <input
             type="time"
             value={startTime}
-            onChange={(e) => {
-              setStartTime(e.target.value);
-              if (errors.startTime || errors.timeLogic) {
-                setErrors({...errors, startTime: '', timeLogic: ''});
-              }
-            }}
-            className={errors.startTime || errors.timeLogic ? 'error' : ''}
+            onChange={(e) => setStartTime(e.target.value)}
           />
-          {errors.startTime && <span className="error-message">{errors.startTime}</span>}
         </div>
 
         <div className="form-group">
@@ -317,223 +313,193 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
           <input
             type="time"
             value={endTime}
-            onChange={(e) => {
-              setEndTime(e.target.value);
-              if (errors.timeLogic) {
-                setErrors({...errors, timeLogic: ''});
-              }
-            }}
-            className={errors.timeLogic ? 'error' : ''}
+            onChange={(e) => setEndTime(e.target.value)}
           />
-          {errors.timeLogic && <span className="error-message">{errors.timeLogic}</span>}
-        </div>
-
-        {/* 移動時間（自動計算） */}
-        {duration.minutes > 0 && (
-          <div className="form-group">
-            <label>移動時間:</label>
+          {duration.minutes > 0 && (
             <div className="duration-display">
-              {duration.text}
+              移動時間: {duration.text}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* 移動元 */}
         <div className="form-group">
-          <label>移動元: <span className="required">*</span></label>
-          <div className="location-selection">
-            <select
-              value={isCustomFromLocation ? 'custom' : fromLocation}
-              onChange={(e) => {
-                if (e.target.value === 'custom') {
-                  setIsCustomFromLocation(true);
-                  setFromLocation('');
-                } else {
-                  setIsCustomFromLocation(false);
-                  setFromLocation(e.target.value);
-                }
-                if (errors.fromLocation) {
-                  setErrors({...errors, fromLocation: ''});
-                }
-              }}
-              className={errors.fromLocation ? 'error' : ''}
-            >
-              <option value="">選択してください</option>
-              {locations.map(location => (
-                <option key={location} value={location}>{location}</option>
-              ))}
-              <option value="custom">その他（手入力）</option>
-            </select>
-            
-            {isCustomFromLocation && (
-              <input
-                type="text"
-                value={fromLocationInput}
+          <label>移動元:</label>
+          {loadingMasterData ? (
+            <div className="loading-text">マスタデータ読み込み中...</div>
+          ) : (
+            <div className="location-selection">
+              <select
+                value={isCustomFromLocation ? 'custom' : fromLocation}
                 onChange={(e) => {
-                  setFromLocationInput(e.target.value);
-                  if (errors.fromLocation) {
-                    setErrors({...errors, fromLocation: ''});
+                  if (e.target.value === 'custom') {
+                    setIsCustomFromLocation(true);
+                    setFromLocation('');
+                  } else {
+                    setIsCustomFromLocation(false);
+                    setFromLocation(e.target.value);
                   }
                 }}
-                placeholder="移動元を入力"
-                className={errors.fromLocation ? 'error' : ''}
-                style={{ marginTop: '5px' }}
-              />
-            )}
-          </div>
-          {errors.fromLocation && <span className="error-message">{errors.fromLocation}</span>}
+              >
+                <option value="">
+                  {masterLocations.length > 0 ? '登録された場所を選択' : 'よく使う場所を選択'}
+                </option>
+                {locationOptions.map(location => (
+                  <option key={location} value={location}>{location}</option>
+                ))}
+                <option value="custom">手入力で追加</option>
+              </select>
+              
+              {isCustomFromLocation && (
+                <input
+                  type="text"
+                  value={fromLocationInput}
+                  onChange={(e) => setFromLocationInput(e.target.value)}
+                  placeholder="移動元を入力"
+                  className="custom-input"
+                />
+              )}
+            </div>
+          )}
         </div>
 
         {/* 移動先 */}
         <div className="form-group">
-          <label>移動先: <span className="required">*</span></label>
-          <div className="location-selection">
-            <select
-              value={isCustomToLocation ? 'custom' : toLocation}
-              onChange={(e) => {
-                if (e.target.value === 'custom') {
-                  setIsCustomToLocation(true);
-                  setToLocation('');
-                } else {
-                  setIsCustomToLocation(false);
-                  setToLocation(e.target.value);
-                }
-                if (errors.toLocation) {
-                  setErrors({...errors, toLocation: ''});
-                }
-              }}
-              className={errors.toLocation ? 'error' : ''}
-            >
-              <option value="">選択してください</option>
-              {locations.map(location => (
-                <option key={location} value={location}>{location}</option>
-              ))}
-              <option value="custom">その他（手入力）</option>
-            </select>
-            
-            {isCustomToLocation && (
-              <input
-                type="text"
-                value={toLocationInput}
+          <label>移動先:</label>
+          {loadingMasterData ? (
+            <div className="loading-text">マスタデータ読み込み中...</div>
+          ) : (
+            <div className="location-selection">
+              <select
+                value={isCustomToLocation ? 'custom' : toLocation}
                 onChange={(e) => {
-                  setToLocationInput(e.target.value);
-                  if (errors.toLocation) {
-                    setErrors({...errors, toLocation: ''});
+                  if (e.target.value === 'custom') {
+                    setIsCustomToLocation(true);
+                    setToLocation('');
+                  } else {
+                    setIsCustomToLocation(false);
+                    setToLocation(e.target.value);
                   }
                 }}
-                placeholder="移動先を入力"
-                className={errors.toLocation ? 'error' : ''}
-                style={{ marginTop: '5px' }}
-              />
-            )}
-          </div>
-          {errors.toLocation && <span className="error-message">{errors.toLocation}</span>}
+              >
+                <option value="">
+                  {masterLocations.length > 0 ? '登録された場所を選択' : 'よく使う場所を選択'}
+                </option>
+                {locationOptions.map(location => (
+                  <option key={location} value={location}>{location}</option>
+                ))}
+                <option value="custom">手入力で追加</option>
+              </select>
+              
+              {isCustomToLocation && (
+                <input
+                  type="text"
+                  value={toLocationInput}
+                  onChange={(e) => setToLocationInput(e.target.value)}
+                  placeholder="移動先を入力"
+                  className="custom-input"
+                />
+              )}
+            </div>
+          )}
         </div>
 
-        {/* 移動手段 */}
+        {/* 交通手段 */}
         <div className="form-group">
-          <label>移動手段:</label>
-          <select
-            value={transportMethod}
-            onChange={(e) => setTransportMethod(e.target.value)}
-          >
-            {transportMethods.map(method => (
-              <option key={method} value={method}>{method}</option>
-            ))}
-          </select>
+          <label>交通手段:</label>
+          {loadingMasterData ? (
+            <div className="loading-text">マスタデータ読み込み中...</div>
+          ) : (
+            <select
+              value={transportMethod}
+              onChange={(e) => setTransportMethod(e.target.value)}
+            >
+              {transportMethodOptions.map(method => (
+                <option key={method} value={method}>{method}</option>
+              ))}
+            </select>
+          )}
+          {masterTransportMethods.length === 0 && !loadingMasterData && (
+            <div className="master-data-hint">
+              💡 設定画面で交通手段を追加できます
+            </div>
+          )}
         </div>
 
         {/* 消費カロリー */}
         <div className="form-group">
-          <label>消費カロリー:</label>
+          <label>消費カロリー (任意):</label>
           <input
             type="number"
             value={caloriesBurned}
-            onChange={(e) => {
-              setCaloriesBurned(e.target.value);
-              if (errors.caloriesBurned) {
-                setErrors({...errors, caloriesBurned: ''});
-              }
-            }}
+            onChange={(e) => setCaloriesBurned(e.target.value)}
             placeholder="kcal"
-            className={errors.caloriesBurned ? 'error' : ''}
           />
-          {errors.caloriesBurned && <span className="error-message">{errors.caloriesBurned}</span>}
         </div>
 
         {/* 交通費支払い */}
         <div className="form-group">
-          <div className="checkbox-group">
-            <input
-              type="checkbox"
-              id="hasPayment"
-              checked={hasPayment}
-              onChange={(e) => setHasPayment(e.target.checked)}
-            />
-            <label htmlFor="hasPayment">交通費の支払いあり</label>
+          <div className="switch-group">
+            <label>交通費の支払い: 料金が発生した場合</label>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={hasPayment}
+                onChange={(e) => setHasPayment(e.target.checked)}
+              />
+              <span className="slider"></span>
+            </label>
           </div>
 
           {hasPayment && (
             <div className="payment-info">
               <div className="form-group">
                 <label>支払先:</label>
-                <div className="location-selection">
-                  <select
-                    value={isCustomPaymentLocation ? 'custom' : paymentLocation}
-                    onChange={(e) => {
-                      if (e.target.value === 'custom') {
-                        setIsCustomPaymentLocation(true);
-                        setPaymentLocation('');
-                      } else {
-                        setIsCustomPaymentLocation(false);
-                        setPaymentLocation(e.target.value);
-                      }
-                      if (errors.paymentLocation) {
-                        setErrors({...errors, paymentLocation: ''});
-                      }
-                    }}
-                    className={errors.paymentLocation ? 'error' : ''}
-                  >
-                    <option value="">選択してください</option>
-                    {paymentLocations.map(location => (
-                      <option key={location} value={location}>{location}</option>
-                    ))}
-                    <option value="custom">その他（手入力）</option>
-                  </select>
-                  
-                  {isCustomPaymentLocation && (
-                    <input
-                      type="text"
-                      value={paymentLocationInput}
+                {loadingMasterData ? (
+                  <div className="loading-text">マスタデータ読み込み中...</div>
+                ) : (
+                  <div className="store-selection">
+                    <select
+                      value={isCustomPaymentLocation ? 'custom' : paymentLocation}
                       onChange={(e) => {
-                        setPaymentLocationInput(e.target.value);
-                        if (errors.paymentLocation) {
-                          setErrors({...errors, paymentLocation: ''});
+                        if (e.target.value === 'custom') {
+                          setIsCustomPaymentLocation(true);
+                          setPaymentLocation('');
+                        } else {
+                          setIsCustomPaymentLocation(false);
+                          setPaymentLocation(e.target.value);
                         }
                       }}
-                      placeholder="支払先を入力"
-                      className={errors.paymentLocation ? 'error' : ''}
-                      style={{ marginTop: '5px' }}
-                    />
-                  )}
-                </div>
-                {errors.paymentLocation && <span className="error-message">{errors.paymentLocation}</span>}
+                    >
+                      <option value="">
+                        {masterStores.length > 0 ? '登録された事業者を選択' : '交通事業者を選択'}
+                      </option>
+                      {storeOptions.map(store => (
+                        <option key={store} value={store}>{store}</option>
+                      ))}
+                      <option value="custom">手入力で追加</option>
+                    </select>
+                    
+                    {isCustomPaymentLocation && (
+                      <input
+                        type="text"
+                        value={paymentLocationInput}
+                        onChange={(e) => setPaymentLocationInput(e.target.value)}
+                        placeholder="事業者名を入力"
+                        className="custom-input"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label>金額:</label>
                 <input
                   type="number"
                   value={amount}
-                  onChange={(e) => {
-                    setAmount(e.target.value);
-                    if (errors.amount) {
-                      setErrors({...errors, amount: ''});
-                    }
-                  }}
+                  onChange={(e) => setAmount(e.target.value)}
                   placeholder="円"
-                  className={errors.amount ? 'error' : ''}
                 />
-                {errors.amount && <span className="error-message">{errors.amount}</span>}
               </div>
               <div className="form-group">
                 <label>支払方法:</label>
@@ -541,9 +507,10 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                 >
-                  {paymentMethods.map(method => (
-                    <option key={method} value={method}>{method}</option>
-                  ))}
+                  <option value="交通系IC">交通系IC</option>
+                  <option value="現金">現金</option>
+                  <option value="クレジットカード">クレジットカード</option>
+                  <option value="電子マネー">電子マネー</option>
                 </select>
               </div>
             </div>
@@ -573,6 +540,12 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
             rows="2"
           />
         </div>
+
+        {masterLocations.length === 0 && !loadingMasterData && (
+          <div className="master-data-hint">
+            💡 設定画面で場所を追加すると、移動記録がより便利になります
+          </div>
+        )}
       </div>
 
       {/* 削除ボタン（編集時のみ表示） */}
