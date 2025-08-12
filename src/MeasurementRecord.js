@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDoc } from 'firebase/firestore';
 
 function MeasurementRecord({ onBack, onSave, editingRecord }) {
   const [recordTime, setRecordTime] = useState(() => {
@@ -17,10 +17,43 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
   const [waistSize, setWaistSize] = useState('');
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [memo, setMemo] = useState('');
-  const [errors, setErrors] = useState({});
 
-  // 仮の身長（今後は設定から取得）
-  const height = 170.0; // cm
+  // ユーザー設定情報
+  const [userHeight, setUserHeight] = useState(170.0); // デフォルト値
+  const [userGender, setUserGender] = useState('male');
+  const [userAge, setUserAge] = useState(30);
+
+  // ユーザー設定の読み込み
+  useEffect(() => {
+    const loadUserSettings = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'settings', 'userInfo'));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.height) {
+            setUserHeight(data.height);
+          }
+          if (data.gender) {
+            setUserGender(data.gender);
+          }
+          if (data.birthDate) {
+            // 年齢計算
+            const today = new Date();
+            const birth = new Date(data.birthDate);
+            let age = today.getFullYear() - birth.getFullYear();
+            const monthDiff = today.getMonth() - birth.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+              age--;
+            }
+            setUserAge(age);
+          }
+        }
+      } catch (error) {
+        console.error('ユーザー設定読み込みエラー:', error);
+      }
+    };
+    loadUserSettings();
+  }, []);
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -38,9 +71,9 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
 
   // BMI計算
   const calculateBMI = () => {
-    if (!weight || weight <= 0 || height <= 0) return null;
+    if (!weight || weight <= 0 || userHeight <= 0) return null;
     const weightNum = parseFloat(weight);
-    const heightM = height / 100; // cmをmに変換
+    const heightM = userHeight / 100; // cmをmに変換
     const bmi = weightNum / (heightM * heightM);
     return Math.round(bmi * 10) / 10; // 小数点1桁
   };
@@ -56,74 +89,49 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
     return '肥満(2度以上)';
   };
 
-  // バリデーション
-  const validateForm = () => {
-    const newErrors = {};
-
-    // 体重チェック（必須）
-    if (!weight) {
-      newErrors.weight = '体重を入力してください';
+  // 基礎代謝計算（Harris-Benedict式）
+  const calculateBMR = () => {
+    if (!weight || !userHeight || !userAge) return null;
+    const weightNum = parseFloat(weight);
+    
+    if (userGender === 'male') {
+      // 男性: BMR = 88.362 + (13.397 × 体重kg) + (4.799 × 身長cm) - (5.677 × 年齢)
+      return Math.round(88.362 + (13.397 * weightNum) + (4.799 * userHeight) - (5.677 * userAge));
     } else {
-      const weightNum = parseFloat(weight);
-      if (weightNum < 20 || weightNum > 300) {
-        newErrors.weight = '体重は20kg〜300kgで入力してください';
-      }
+      // 女性: BMR = 447.593 + (9.247 × 体重kg) + (3.098 × 身長cm) - (4.330 × 年齢)
+      return Math.round(447.593 + (9.247 * weightNum) + (3.098 * userHeight) - (4.330 * userAge));
     }
-
-    // 体脂肪率チェック（任意だが、入力時は範囲チェック）
-    if (bodyFatRate) {
-      const bodyFatNum = parseFloat(bodyFatRate);
-      if (bodyFatNum < 0 || bodyFatNum > 50) {
-        newErrors.bodyFatRate = '体脂肪率は0%〜50%で入力してください';
-      }
-    }
-
-    // 血圧チェック（両方入力または両方未入力）
-    if (bloodPressureHigh || bloodPressureLow) {
-      if (!bloodPressureHigh || !bloodPressureLow) {
-        newErrors.bloodPressure = '血圧は最高・最低両方を入力してください';
-      } else {
-        const highNum = parseInt(bloodPressureHigh);
-        const lowNum = parseInt(bloodPressureLow);
-        if (highNum < 50 || highNum > 300 || lowNum < 30 || lowNum > 200) {
-          newErrors.bloodPressure = '血圧の値が範囲外です（最高:50-300、最低:30-200）';
-        } else if (highNum <= lowNum) {
-          newErrors.bloodPressure = '最高血圧は最低血圧より高い値を入力してください';
-        }
-      }
-    }
-
-    // 腹囲チェック（任意だが、入力時は範囲チェック）
-    if (waistSize) {
-      const waistNum = parseFloat(waistSize);
-      if (waistNum < 30 || waistNum > 200) {
-        newErrors.waistSize = '腹囲は30cm〜200cmで入力してください';
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
+
+  const bmr = calculateBMR();
+
+  // 標準体重計算
+  const calculateStandardWeight = () => {
+    if (!userHeight) return null;
+    const heightM = userHeight / 100;
+    return Math.round(22 * heightM * heightM * 10) / 10; // BMI22での体重
+  };
+
+  const standardWeight = calculateStandardWeight();
 
   // 保存処理
   const handleSave = async () => {
-    if (!validateForm()) {
-      alert('入力内容に不備があります。エラーメッセージを確認してください。');
-      return;
-    }
-
     try {
       const measurementData = {
         category: '計量',
         recordTime: recordTime,
-        weight: parseFloat(weight),
+        weight: parseFloat(weight) || null,
         bodyFatRate: parseFloat(bodyFatRate) || null,
         bloodPressureHigh: parseInt(bloodPressureHigh) || null,
         bloodPressureLow: parseInt(bloodPressureLow) || null,
         waistSize: parseFloat(waistSize) || null,
         bmi: bmi,
         bmiCategory: getBMICategory(bmi),
-        height: height, // 計算に使用した身長も保存
+        bmr: bmr, // 基礎代謝を追加
+        standardWeight: standardWeight, // 標準体重を追加
+        height: userHeight, // 計算に使用した身長も保存
+        age: userAge, // 計算に使用した年齢も保存
+        gender: userGender, // 計算に使用した性別も保存
         useLocationInfo: useLocationInfo,
         memo: memo,
         createdAt: editingRecord ? editingRecord.createdAt : new Date(),
@@ -183,23 +191,19 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
 
         {/* 体重 */}
         <div className="form-group">
-          <label>体重: <span className="required">*</span></label>
+          <label>体重:</label>
           <input
             type="number"
             step="0.1"
             value={weight}
-            onChange={(e) => {
-              setWeight(e.target.value);
-              if (errors.weight) {
-                setErrors({...errors, weight: ''});
-              }
-            }}
+            onChange={(e) => setWeight(e.target.value)}
             placeholder="kg"
-            min="20"
-            max="300"
-            className={errors.weight ? 'error' : ''}
           />
-          {errors.weight && <span className="error-message">{errors.weight}</span>}
+          {standardWeight && (
+            <div className="standard-weight-info">
+              標準体重: {standardWeight}kg (BMI22基準)
+            </div>
+          )}
         </div>
 
         {/* BMI表示 */}
@@ -210,7 +214,20 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
               <span className="bmi-value">{bmi}</span>
               <span className="bmi-category">({getBMICategory(bmi)})</span>
             </div>
-            <div className="bmi-note">身長: {height}cm で計算</div>
+            <div className="bmi-note">身長: {userHeight}cm で計算</div>
+          </div>
+        )}
+
+        {/* 基礎代謝表示 */}
+        {bmr && (
+          <div className="form-group">
+            <label>基礎代謝:</label>
+            <div className="bmr-display">
+              <span className="bmr-value">{bmr} kcal/日</span>
+            </div>
+            <div className="bmr-note">
+              {userAge}歳 {userGender === 'male' ? '男性' : '女性'} {userHeight}cm {weight}kg で計算
+            </div>
           </div>
         )}
 
@@ -221,18 +238,9 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
             type="number"
             step="0.1"
             value={bodyFatRate}
-            onChange={(e) => {
-              setBodyFatRate(e.target.value);
-              if (errors.bodyFatRate) {
-                setErrors({...errors, bodyFatRate: ''});
-              }
-            }}
+            onChange={(e) => setBodyFatRate(e.target.value)}
             placeholder="% (任意)"
-            min="0"
-            max="50"
-            className={errors.bodyFatRate ? 'error' : ''}
           />
-          {errors.bodyFatRate && <span className="error-message">{errors.bodyFatRate}</span>}
         </div>
 
         {/* 血圧 */}
@@ -242,35 +250,18 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
             <input
               type="number"
               value={bloodPressureHigh}
-              onChange={(e) => {
-                setBloodPressureHigh(e.target.value);
-                if (errors.bloodPressure) {
-                  setErrors({...errors, bloodPressure: ''});
-                }
-              }}
+              onChange={(e) => setBloodPressureHigh(e.target.value)}
               placeholder="最高"
-              min="50"
-              max="300"
-              className={errors.bloodPressure ? 'error' : ''}
             />
             <span className="separator">/</span>
             <input
               type="number"
               value={bloodPressureLow}
-              onChange={(e) => {
-                setBloodPressureLow(e.target.value);
-                if (errors.bloodPressure) {
-                  setErrors({...errors, bloodPressure: ''});
-                }
-              }}
+              onChange={(e) => setBloodPressureLow(e.target.value)}
               placeholder="最低"
-              min="30"
-              max="200"
-              className={errors.bloodPressure ? 'error' : ''}
             />
             <span className="unit">mmHg (任意)</span>
           </div>
-          {errors.bloodPressure && <span className="error-message">{errors.bloodPressure}</span>}
         </div>
 
         {/* 腹囲 */}
@@ -280,18 +271,9 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
             type="number"
             step="0.1"
             value={waistSize}
-            onChange={(e) => {
-              setWaistSize(e.target.value);
-              if (errors.waistSize) {
-                setErrors({...errors, waistSize: ''});
-              }
-            }}
+            onChange={(e) => setWaistSize(e.target.value)}
             placeholder="cm (任意)"
-            min="30"
-            max="200"
-            className={errors.waistSize ? 'error' : ''}
           />
-          {errors.waistSize && <span className="error-message">{errors.waistSize}</span>}
         </div>
 
         {/* 位置情報・メモ */}
