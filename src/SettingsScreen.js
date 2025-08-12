@@ -59,7 +59,13 @@ function SettingsScreen({ onBack }) {
       return;
     }
     
-    const collectionName = getCurrentCollection();
+    // getCurrentCollection関数をuseEffect内に移動
+    const getCollectionName = () => {
+      const tab = masterDataTabs.find(tab => tab.id === activeTab);
+      return tab?.collection || 'master_stores';
+    };
+    
+    const collectionName = getCollectionName();
     console.log('データ読み込み開始:', collectionName);
     
     const q = query(
@@ -102,10 +108,17 @@ function SettingsScreen({ onBack }) {
 
     try {
       const currentData = getCurrentData();
+      
+      // getCurrentCollection関数をローカルで定義
+      const getCollectionName = () => {
+        const tab = masterDataTabs.find(tab => tab.id === activeTab);
+        return tab?.collection || 'master_stores';
+      };
+      
       const newOrder = currentData.length > 0 ? 
         Math.max(...currentData.map(item => item.order || 0)) + 1 : 1;
 
-      await addDoc(collection(db, getCurrentCollection()), {
+      await addDoc(collection(db, getCollectionName()), {
         name: newItemName.trim(),
         order: newOrder,
         createdAt: new Date(),
@@ -124,7 +137,13 @@ function SettingsScreen({ onBack }) {
     if (!editingName.trim()) return;
 
     try {
-      await updateDoc(doc(db, getCurrentCollection(), itemId), {
+      // getCurrentCollection関数をローカルで定義
+      const getCollectionName = () => {
+        const tab = masterDataTabs.find(tab => tab.id === activeTab);
+        return tab?.collection || 'master_stores';
+      };
+
+      await updateDoc(doc(db, getCollectionName(), itemId), {
         name: editingName.trim(),
         updatedAt: new Date()
       });
@@ -142,7 +161,13 @@ function SettingsScreen({ onBack }) {
     if (!window.confirm('このアイテムを削除しますか？')) return;
 
     try {
-      await deleteDoc(doc(db, getCurrentCollection(), itemId));
+      // getCurrentCollection関数をローカルで定義
+      const getCollectionName = () => {
+        const tab = masterDataTabs.find(tab => tab.id === activeTab);
+        return tab?.collection || 'master_stores';
+      };
+
+      await deleteDoc(doc(db, getCollectionName(), itemId));
     } catch (error) {
       console.error('削除エラー:', error);
       alert('削除に失敗しました');
@@ -169,9 +194,15 @@ function SettingsScreen({ onBack }) {
     const [draggedItem] = reorderedData.splice(dragIndex, 1);
     reorderedData.splice(dropIndex, 0, draggedItem);
 
+    // getCurrentCollection関数をローカルで定義
+    const getCollectionName = () => {
+      const tab = masterDataTabs.find(tab => tab.id === activeTab);
+      return tab?.collection || 'master_stores';
+    };
+
     // 順序を更新
     const updatePromises = reorderedData.map((item, index) =>
-      updateDoc(doc(db, getCurrentCollection(), item.id), {
+      updateDoc(doc(db, getCollectionName(), item.id), {
         order: index + 1,
         updatedAt: new Date()
       })
