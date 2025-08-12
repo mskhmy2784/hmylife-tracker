@@ -67,7 +67,7 @@ function SettingsScreen({ onBack }) {
   useEffect(() => {
     // 支払先の読み込み
     const unsubscribePaymentLocations = onSnapshot(
-      query(collection(db, 'masterData', 'paymentLocations', 'items'), orderBy('name')),
+      query(collection(db, 'masterData', 'paymentLocations', 'items'), orderBy('order', 'asc')),
       (snapshot) => {
         const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setPaymentLocations(items);
@@ -76,7 +76,7 @@ function SettingsScreen({ onBack }) {
 
     // 支払方法の読み込み
     const unsubscribePaymentMethods = onSnapshot(
-      query(collection(db, 'masterData', 'paymentMethods', 'items'), orderBy('name')),
+      query(collection(db, 'masterData', 'paymentMethods', 'items'), orderBy('order', 'asc')),
       (snapshot) => {
         const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setPaymentMethods(items);
@@ -85,7 +85,7 @@ function SettingsScreen({ onBack }) {
 
     // 場所の読み込み
     const unsubscribeLocations = onSnapshot(
-      query(collection(db, 'masterData', 'locations', 'items'), orderBy('name')),
+      query(collection(db, 'masterData', 'locations', 'items'), orderBy('order', 'asc')),
       (snapshot) => {
         const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setLocations(items);
@@ -274,6 +274,54 @@ function SettingsScreen({ onBack }) {
       alert('保存に失敗しました');
     } finally {
       setCaloriesSaving(false);
+    }
+  };
+
+  // ドラッグ&ドロップ関連の処理
+  const handleDragStart = (e, index, type) => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({ index, type }));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e, dropIndex, type) => {
+    e.preventDefault();
+    
+    try {
+      const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+      const dragIndex = dragData.index;
+      
+      if (dragIndex === dropIndex || dragData.type !== type) return;
+
+      // 該当するデータ配列を取得
+      const items = type === 'paymentLocation' ? paymentLocations :
+                   type === 'paymentMethod' ? paymentMethods : locations;
+      
+      // 配列を並び替え
+      const newItems = [...items];
+      const draggedItem = newItems[dragIndex];
+      newItems.splice(dragIndex, 1);
+      newItems.splice(dropIndex, 0, draggedItem);
+
+      // order値を更新
+      const batch = writeBatch(db);
+      const collectionPath = type === 'paymentLocation' ? 'masterData/paymentLocations/items' :
+                            type === 'paymentMethod' ? 'masterData/paymentMethods/items' :
+                            'masterData/locations/items';
+
+      newItems.forEach((item, index) => {
+        const docRef = doc(db, collectionPath, item.id);
+        batch.update(docRef, { order: index });
+      });
+
+      await batch.commit();
+    } catch (error) {
+      console.error('並び替えエラー:', error);
+      alert('並び替えに失敗しました');
     }
   };
 
@@ -495,8 +543,16 @@ function SettingsScreen({ onBack }) {
                 </button>
               </div>
               <div className="master-list">
-                {paymentLocations.map(item => (
-                  <div key={item.id} className="master-item">
+                {paymentLocations.map((item, index) => (
+                  <div 
+                    key={item.id} 
+                    className="master-item draggable"
+                    draggable="true"
+                    onDragStart={(e) => handleDragStart(e, index, 'paymentLocation')}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, index, 'paymentLocation')}
+                  >
+                    <span className="drag-handle">⋮⋮</span>
                     <span className="item-name">{item.name}</span>
                     <button 
                       className="delete-item-btn"
@@ -527,8 +583,16 @@ function SettingsScreen({ onBack }) {
                 </button>
               </div>
               <div className="master-list">
-                {paymentMethods.map(item => (
-                  <div key={item.id} className="master-item">
+                {paymentMethods.map((item, index) => (
+                  <div 
+                    key={item.id} 
+                    className="master-item draggable"
+                    draggable="true"
+                    onDragStart={(e) => handleDragStart(e, index, 'paymentMethod')}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, index, 'paymentMethod')}
+                  >
+                    <span className="drag-handle">⋮⋮</span>
                     <span className="item-name">{item.name}</span>
                     <button 
                       className="delete-item-btn"
@@ -559,8 +623,16 @@ function SettingsScreen({ onBack }) {
                 </button>
               </div>
               <div className="master-list">
-                {locations.map(item => (
-                  <div key={item.id} className="master-item">
+                {locations.map((item, index) => (
+                  <div 
+                    key={item.id} 
+                    className="master-item draggable"
+                    draggable="true"
+                    onDragStart={(e) => handleDragStart(e, index, 'location')}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, index, 'location')}
+                  >
+                    <span className="drag-handle">⋮⋮</span>
                     <span className="item-name">{item.name}</span>
                     <button 
                       className="delete-item-btn"
