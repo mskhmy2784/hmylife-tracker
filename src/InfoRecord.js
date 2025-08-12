@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db, storage } from './firebase';
+import { db } from './firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 function InfoRecord({ onBack, onSave, editingRecord }) {
   const [recordTime, setRecordTime] = useState(() => {
@@ -18,11 +17,38 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
   const [dueTime, setDueTime] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
   const [useLocationInfo, setUseLocationInfo] = useState(true);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [locationError, setLocationError] = useState(null);
   const [memo, setMemo] = useState('');
-  
-  // 写真関連の状態を追加
-  const [photos, setPhotos] = useState([]);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // 位置情報取得
+  useEffect(() => {
+    if (useLocationInfo && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+          setLocationError(null);
+        },
+        (error) => {
+          console.error('位置情報取得エラー:', error);
+          setLocationError(error.message);
+          setCurrentLocation(null);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5分間キャッシュ
+        }
+      );
+    } else if (!useLocationInfo) {
+      setCurrentLocation(null);
+      setLocationError(null);
+    }
+  }, [useLocationInfo]);
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -36,69 +62,13 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
       setIsCompleted(editingRecord.isCompleted || false);
       setUseLocationInfo(editingRecord.useLocationInfo !== false);
       setMemo(editingRecord.memo || '');
-      setPhotos(editingRecord.photos || []); // 既存の写真を読み込み
+      
+      // 編集時は既存の位置情報があれば設定
+      if (editingRecord.location) {
+        setCurrentLocation(editingRecord.location);
+      }
     }
   }, [editingRecord]);
-
-  // 写真撮影・選択処理
-  const handlePhotoCapture = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    setUploadingPhoto(true);
-    try {
-      // ファイル名を生成（日時 + ランダム文字列）
-      const timestamp = new Date().getTime();
-      const randomId = Math.random().toString(36).substring(2, 15);
-      const fileName = `info-photos/${timestamp}_${randomId}.jpg`;
-      
-      // Firebase Storage にアップロード
-      const imageRef = ref(storage, fileName);
-      await uploadBytes(imageRef, file);
-      
-      // ダウンロードURLを取得
-      const downloadURL = await getDownloadURL(imageRef);
-      
-      // 写真リストに追加
-      setPhotos(prev => [...prev, {
-        url: downloadURL,
-        fileName: fileName,
-        uploadedAt: new Date()
-      }]);
-      
-      alert('写真をアップロードしました！');
-    } catch (error) {
-      console.error('写真アップロードエラー:', error);
-      alert('写真のアップロードに失敗しました');
-    } finally {
-      setUploadingPhoto(false);
-      // input要素をリセット（同じファイルを再選択可能にする）
-      event.target.value = '';
-    }
-  };
-
-  // 写真削除処理
-  const handlePhotoDelete = async (photoIndex) => {
-    const photo = photos[photoIndex];
-    if (!photo) return;
-
-    const confirmDelete = window.confirm('この写真を削除しますか？');
-    if (!confirmDelete) return;
-
-    try {
-      // Firebase Storage から削除
-      const imageRef = ref(storage, photo.fileName);
-      await deleteObject(imageRef);
-      
-      // 状態から削除
-      setPhotos(prev => prev.filter((_, index) => index !== photoIndex));
-      
-      alert('写真を削除しました');
-    } catch (error) {
-      console.error('写真削除エラー:', error);
-      alert('写真の削除に失敗しました');
-    }
-  };
 
   // 保存処理
   const handleSave = async () => {
@@ -113,18 +83,17 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
         dueTime: infoType === 'TODO' ? dueTime : '',
         isCompleted: infoType === 'TODO' ? isCompleted : false,
         useLocationInfo: useLocationInfo,
+        location: useLocationInfo && currentLocation ? currentLocation : null,
         memo: memo,
-        photos: photos, // 写真データを追加
         createdAt: editingRecord ? editingRecord.createdAt : new Date(),
+        updatedAt: new Date(),
         date: new Date().toDateString()
       };
 
       if (editingRecord) {
         await updateDoc(doc(db, 'records', editingRecord.id), infoData);
-        alert('情報記録を更新しました！');
       } else {
         await addDoc(collection(db, 'records'), infoData);
-        alert('情報記録を保存しました！');
       }
       
       onSave();
@@ -136,35 +105,29 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
 
   // 削除処理
   const handleDelete = async () => {
-    if (!editingRecord) return;
-    
-    const confirmDelete = window.confirm('この記録を削除しますか？');
-    if (!confirmDelete) return;
-
-    try {
-      // 関連する写真もStorage から削除
-      for (const photo of photos) {
-        try {
-          const imageRef = ref(storage, photo.fileName);
-          await deleteObject(imageRef);
-        } catch (error) {
-          console.warn('写真削除エラー:', error);
-        }
+    if (window.confirm('この記録を削除しますか？')) {
+      try {
+        await deleteDoc(doc(db, 'records', editingRecord.id));
+        onBack();
+      } catch (error) {
+        console.error('削除エラー:', error);
+        alert('削除に失敗しました');
       }
-      
-      await deleteDoc(doc(db, 'records', editingRecord.id));
-      alert('情報記録を削除しました');
-      onSave();
-    } catch (error) {
-      console.error('削除エラー:', error);
-      alert('削除に失敗しました');
     }
   };
 
+  // 位置情報ステータス表示
+  const getLocationStatus = () => {
+    if (!useLocationInfo) return '';
+    if (locationError) return '❌ 位置情報取得失敗';
+    if (currentLocation) return '✅ 位置情報取得完了';
+    return '📍 位置情報取得中...';
+  };
+
   return (
-    <div className="info-record">
+    <div className="record-screen">
       <div className="record-header">
-        <button className="back-btn" onClick={onBack}>←</button>
+        <button className="back-btn" onClick={onBack}>← 戻る</button>
         <h2>{editingRecord ? '情報記録編集' : '情報記録'}</h2>
         <button className="save-btn" onClick={handleSave}>保存</button>
       </div>
@@ -180,39 +143,47 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
           />
         </div>
 
-        {/* 情報種別 */}
+        {/* 種別選択 */}
         <div className="form-group">
-          <label>情報種別:</label>
+          <label>種別:</label>
           <div className="info-type-buttons">
-            {['メモ', 'TODO'].map(type => (
-              <button
-                key={type}
-                className={`type-btn ${infoType === type ? 'active' : ''}`}
-                onClick={() => setInfoType(type)}
-              >
-                {type}
-              </button>
-            ))}
+            <button
+              className={`type-btn ${infoType === 'メモ' ? 'active' : ''}`}
+              onClick={() => setInfoType('メモ')}
+            >
+              メモ
+            </button>
+            <button
+              className={`type-btn ${infoType === 'TODO' ? 'active' : ''}`}
+              onClick={() => setInfoType('TODO')}
+            >
+              TODO
+            </button>
           </div>
         </div>
 
-        {/* 優先度 */}
+        {/* 重要度 - ボタン形式に変更 */}
         <div className="form-group">
-          <label>優先度:</label>
+          <label>重要度:</label>
           <div className="priority-buttons">
-            {[
-              { value: '重要', icon: '🔴', label: '重要' },
-              { value: '通常', icon: '🟡', label: '通常' },
-              { value: '低', icon: '🟢', label: '低' }
-            ].map(item => (
-              <button
-                key={item.value}
-                className={`priority-btn ${priority === item.value ? 'active' : ''}`}
-                onClick={() => setPriority(item.value)}
-              >
-                {item.icon} {item.label}
-              </button>
-            ))}
+            <button
+              className={`priority-btn high ${priority === '重要' ? 'active' : ''}`}
+              onClick={() => setPriority('重要')}
+            >
+              🔴 重要
+            </button>
+            <button
+              className={`priority-btn normal ${priority === '通常' ? 'active' : ''}`}
+              onClick={() => setPriority('通常')}
+            >
+              🟡 通常
+            </button>
+            <button
+              className={`priority-btn low ${priority === '低' ? 'active' : ''}`}
+              onClick={() => setPriority('低')}
+            >
+              🟢 低
+            </button>
           </div>
         </div>
 
@@ -222,117 +193,73 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
           <textarea
             value={infoContent}
             onChange={(e) => setInfoContent(e.target.value)}
-            placeholder="情報の詳細を入力してください"
+            placeholder="メモまたはTODOの内容"
             rows="4"
           />
         </div>
 
-        {/* TODO用の期限設定 */}
+        {/* TODO専用項目 */}
         {infoType === 'TODO' && (
-          <div className="todo-section">
+          <div className="todo-specific">
+            {/* 期限 - 1行に統合 */}
             <div className="form-group">
-              <label>期限:</label>
-              <div className="due-date-input">
+              <label>期限 (任意):</label>
+              <div className="due-date-time-row">
                 <input
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
+                  placeholder="日付"
                 />
                 <input
                   type="time"
                   value={dueTime}
                   onChange={(e) => setDueTime(e.target.value)}
-                  style={{ marginLeft: '10px' }}
+                  placeholder="時刻"
                 />
               </div>
             </div>
 
+            {/* 完了状況 - 1行に統合 */}
             <div className="form-group">
-              <label>完了状態:</label>
-              <div className="completion-toggle">
-                <div className="toggle-container">
-                  <span className={`status-label ${!isCompleted ? 'active' : ''}`}>未完了</span>
-                  <label className="switch">
-                    <input
-                      type="checkbox"
-                      checked={isCompleted}
-                      onChange={(e) => setIsCompleted(e.target.checked)}
-                    />
-                    <span className="slider"></span>
-                  </label>
-                  <span className={`status-label ${isCompleted ? 'active' : ''}`}>完了 {isCompleted ? '✅' : ''}</span>
-                </div>
+              <div className="completion-row">
+                <label>完了状況:</label>
+                <span className={`status-label ${!isCompleted ? 'active' : ''}`}>未完了</span>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={isCompleted}
+                    onChange={(e) => setIsCompleted(e.target.checked)}
+                  />
+                  <span className="slider"></span>
+                </label>
+                <span className={`status-label ${isCompleted ? 'active' : ''}`}>完了 {isCompleted ? '✅' : ''}</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* 写真撮影・選択 */}
+        {/* 位置情報 - スイッチに変更 */}
         <div className="form-group">
-          <label>写真（資料・メモ・スクリーンショットなど）:</label>
-          <div className="photo-section">
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handlePhotoCapture}
-              disabled={uploadingPhoto}
-              style={{ marginBottom: '10px' }}
-            />
-            {uploadingPhoto && <p>アップロード中...</p>}
-            
-            {/* 撮影済み写真の表示 */}
-            {photos.length > 0 && (
-              <div className="photos-grid">
-                {photos.map((photo, index) => (
-                  <div key={index} className="photo-item">
-                    <img 
-                      src={photo.url} 
-                      alt={`情報写真 ${index + 1}`}
-                      style={{
-                        width: '100px',
-                        height: '100px',
-                        objectFit: 'cover',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <button 
-                      className="photo-delete-btn"
-                      onClick={() => handlePhotoDelete(index)}
-                      style={{
-                        position: 'absolute',
-                        top: '5px',
-                        right: '5px',
-                        background: 'red',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '20px',
-                        height: '20px',
-                        fontSize: '12px'
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="location-switch-row">
+            <label>位置情報を記録:</label>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={useLocationInfo}
+                onChange={(e) => setUseLocationInfo(e.target.checked)}
+              />
+              <span className="slider"></span>
+            </label>
+            <span className="location-status">{getLocationStatus()}</span>
           </div>
-        </div>
-
-        {/* 位置情報・メモ */}
-        <div className="form-group">
-          <div className="checkbox-group">
-            <input
-              type="checkbox"
-              id="useLocationInfo"
-              checked={useLocationInfo}
-              onChange={(e) => setUseLocationInfo(e.target.checked)}
-            />
-            <label htmlFor="useLocationInfo">位置情報を記録</label>
-            <span className="location-status">📍現在地取得中...</span>
-          </div>
+          {currentLocation && useLocationInfo && (
+            <div className="location-details">
+              緯度: {currentLocation.latitude.toFixed(6)}, 
+              経度: {currentLocation.longitude.toFixed(6)}
+              {currentLocation.accuracy && ` (精度: ${Math.round(currentLocation.accuracy)}m)`}
+            </div>
+          )}
         </div>
 
         <div className="form-group">
