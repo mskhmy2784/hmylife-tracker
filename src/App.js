@@ -9,24 +9,33 @@ import ExerciseRecord from './ExerciseRecord';
 import MoveRecord from './MoveRecord';
 import InfoRecord from './InfoRecord';
 import SettingsScreen from './SettingsScreen';
+import LoginScreen from './components/LoginScreen'; // ← 追加
+import { AuthProvider, useAuth } from './contexts/AuthContext'; // ← 追加
 import './App.css';
 
-function App() {
+// メインアプリコンポーネント（認証後に表示される画面）
+function MainApp() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentScreen, setCurrentScreen] = useState('dashboard');
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingRecord, setEditingRecord] = useState(null);
 
-  // データ読み込み
+  // 認証情報を取得
+  const { currentUser, logout } = useAuth();
+
+  // データ読み込み（ユーザー固有のデータのみ）
   useEffect(() => {
+    if (!currentUser) return; // ログインしていない場合は何もしない
+
     console.log('データ読み込み開始:', currentDate);
     const dateString = currentDate.toDateString();
     console.log('検索対象日付:', dateString);
     
     const q = query(
       collection(db, 'records'),
-      where('date', '==', dateString)
+      where('date', '==', dateString),
+      where('userId', '==', currentUser.uid) // ← ユーザー固有のデータのみ取得
     );
 
     const unsubscribe = onSnapshot(q, 
@@ -55,7 +64,7 @@ function App() {
     );
 
     return () => unsubscribe();
-  }, [currentDate]);
+  }, [currentDate, currentUser]);
 
   // その日の概要を計算
   const calculateSummary = () => {
@@ -143,6 +152,18 @@ function App() {
   // 設定画面への遷移
   const handleSettings = () => {
     setCurrentScreen('settings');
+  };
+
+  // ログアウト処理
+  const handleLogout = async () => {
+    if (window.confirm('ログアウトしますか？')) {
+      try {
+        await logout();
+      } catch (error) {
+        console.error('ログアウトエラー:', error);
+        alert('ログアウトに失敗しました');
+      }
+    }
   };
 
   // 編集画面への遷移
@@ -322,91 +343,94 @@ function App() {
     return <InfoRecord onBack={handleBack} onSave={handleSave} editingRecord={editingRecord} />;
   }
 
+  // メイン画面（ダッシュボード）
   return (
     <div className="App">
-      {/* ヘッダー */}
-      <header className="app-header">
-        <h1>Life Tracker</h1>
-        <button className="settings-btn" onClick={handleSettings}>
-          ⚙️
-        </button>
-      </header>
+      {/* ヘッダー（ログアウトボタン追加） */}
+      <div className="app-header">
+        <h1>ライフトラッカー</h1>
+        <div className="header-buttons">
+          <button className="settings-btn" onClick={handleSettings}>⚙️</button>
+          <button className="logout-btn" onClick={handleLogout}>👋</button>
+        </div>
+      </div>
 
       {/* 記録ボタン */}
       <div className="record-buttons">
         <div className="button-row">
-          <button className="record-btn" onClick={() => handleRecord('睡眠')}>
-            😴<br />睡眠
-          </button>
-          <button className="record-btn" onClick={() => handleRecord('計量')}>
-            ⚖️<br />計量
-          </button>
-          <button className="record-btn" onClick={() => handleRecord('食事')}>
-            🍽️<br />食事
-          </button>
-          <button className="record-btn" onClick={() => handleRecord('移動')}>
-            🚶<br />移動
-          </button>
+          <button className="record-btn" onClick={() => handleRecord('食事')}>🍽️ 食事</button>
+          <button className="record-btn" onClick={() => handleRecord('睡眠')}>😴 睡眠</button>
+          <button className="record-btn" onClick={() => handleRecord('支出')}>💰 支出</button>
         </div>
         <div className="button-row">
-          <button className="record-btn" onClick={() => handleRecord('支出')}>
-            💰<br />支出
-          </button>
-          <button className="record-btn" onClick={() => handleRecord('運動')}>
-            🏃<br />運動
-          </button>
-          <button className="record-btn" onClick={() => handleRecord('情報')}>
-            📝<br />情報
-          </button>
-          <button className="record-btn empty">
-          </button>
+          <button className="record-btn" onClick={() => handleRecord('計量')}>⚖️ 計量</button>
+          <button className="record-btn" onClick={() => handleRecord('運動')}>🏃 運動</button>
+          <button className="record-btn" onClick={() => handleRecord('移動')}>🚶 移動</button>
+        </div>
+        <div className="button-row">
+          <button className="record-btn" onClick={() => handleRecord('情報')}>📝 情報</button>
+          <button className="record-btn empty"></button>
+          <button className="record-btn empty"></button>
         </div>
       </div>
 
       {/* 日付選択 */}
       <div className="date-selector">
-        <button className="date-arrow" onClick={() => changeDate(-1)}>
-          &#8249;
-        </button>
-        <span className="current-date">{formatDate(currentDate)}</span>
-        <button className="date-arrow" onClick={() => changeDate(1)}>
-          &#8250;
-        </button>
+        <button className="date-arrow" onClick={() => changeDate(-1)}>←</button>
+        <div className="current-date">{formatDate(currentDate)}</div>
+        <button className="date-arrow" onClick={() => changeDate(1)}>→</button>
       </div>
 
       {/* その日の概要 */}
       <div className="daily-summary">
+        <h3>今日の概要</h3>
         <div className="summary-item">💰 支出: ¥{summary.expense.toLocaleString()}</div>
-        <div className="summary-item">🔥 消費: {summary.caloriesBurn}kcal 📊 摂取: {summary.caloriesIntake}kcal</div>
-        <div className="summary-item">💤 睡眠: {summary.sleepHours}時間 🏃 運動: {summary.exerciseMinutes}分</div>
+        <div className="summary-item">🍽️ 摂取: {summary.caloriesIntake}kcal</div>
+        <div className="summary-item">🔥 消費: {summary.caloriesBurn}kcal</div>
+        <div className="summary-item">😴 睡眠: {summary.sleepHours}時間</div>
+        <div className="summary-item">🏃 運動: {summary.exerciseMinutes}分</div>
       </div>
 
       {/* 時系列一覧 */}
       <div className="timeline">
-        <h3>今日の記録</h3>
+        <h3>記録一覧</h3>
         {loading ? (
-          <div className="timeline-loading">読み込み中...</div>
+          <div>読み込み中...</div>
         ) : records.length === 0 ? (
-          <div className="timeline-empty">まだ記録がありません</div>
+          <div className="timeline-empty">今日の記録はまだありません</div>
         ) : (
-          <div className="timeline-list">
-            {records.map((record) => {
-              const formatted = formatRecord(record);
-              return (
-                <div 
-                  key={record.id} 
-                  className="timeline-item clickable" 
-                  onClick={() => handleEdit(record)}
-                >
-                  <span className="timeline-time">{formatted.time}</span>
-                  <span className="timeline-icon">{formatted.icon}</span>
-                  <span className="timeline-text">{formatted.content}</span>
-                </div>
-              );
-            })}
-          </div>
+          records.map((record) => {
+            const { time, content, icon } = formatRecord(record);
+            return (
+              <div key={record.id} className="timeline-item" onClick={() => handleEdit(record)}>
+                <div className="timeline-time">{time}</div>
+                <div className="timeline-icon">{icon}</div>
+                <div className="timeline-content">{content}</div>
+              </div>
+            );
+          })
         )}
       </div>
+    </div>
+  );
+}
+
+// 最上位のAppコンポーネント（認証プロバイダーとログイン状態管理）
+function App() {
+  return (
+    <AuthProvider>
+      <AppWithAuth />
+    </AuthProvider>
+  );
+}
+
+// 認証状態に応じてログイン画面かメイン画面を表示
+function AppWithAuth() {
+  const { currentUser } = useAuth();
+
+  return (
+    <div>
+      {currentUser ? <MainApp /> : <LoginScreen />}
     </div>
   );
 }
