@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db, storage } from './firebase'; // storage を追加
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'; // Storage 関数を追加
+import { db, storage } from './firebase';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 function MealRecord({ onBack, onSave, editingRecord }) {
   const [recordTime, setRecordTime] = useState(() => {
@@ -24,20 +24,64 @@ function MealRecord({ onBack, onSave, editingRecord }) {
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [memo, setMemo] = useState('');
   
-  // 写真関連の状態を追加
+  // 写真関連の状態
   const [photos, setPhotos] = useState([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // よく使う店舗のマスタデータ
-  const commonStores = [
-    'ファミリーマート',
-    'セブンイレブン', 
-    'ローソン',
-    'スターバックス',
-    'マクドナルド',
-    '吉野家',
-    'すき家'
-  ];
+  // マスタデータの状態
+  const [paymentLocations, setPaymentLocations] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+
+  // マスタデータの読み込み
+  useEffect(() => {
+    // 支払先の読み込み
+    const unsubscribePaymentLocations = onSnapshot(
+      query(collection(db, 'masterData', 'paymentLocations', 'items'), orderBy('name')),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => doc.data().name);
+        setPaymentLocations(items);
+      },
+      (error) => {
+        console.error('支払先マスタ読み込みエラー:', error);
+        // エラー時はデフォルト値を使用
+        setPaymentLocations([
+          'ファミリーマート',
+          'セブンイレブン', 
+          'ローソン',
+          'スターバックス',
+          'マクドナルド',
+          '吉野家',
+          'すき家'
+        ]);
+      }
+    );
+
+    // 支払方法の読み込み
+    const unsubscribePaymentMethods = onSnapshot(
+      query(collection(db, 'masterData', 'paymentMethods', 'items'), orderBy('name')),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => doc.data().name);
+        setPaymentMethods(items);
+      },
+      (error) => {
+        console.error('支払方法マスタ読み込みエラー:', error);
+        // エラー時はデフォルト値を使用
+        setPaymentMethods([
+          '現金',
+          'クレジットカード',
+          '電子マネー',
+          '交通系IC',
+          'QRコード決済',
+          'デビットカード'
+        ]);
+      }
+    );
+
+    return () => {
+      unsubscribePaymentLocations();
+      unsubscribePaymentMethods();
+    };
+  }, []);
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -348,7 +392,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
                   }}
                 >
                   <option value="">選択してください</option>
-                  {commonStores.map(store => (
+                  {paymentLocations.map(store => (
                     <option key={store} value={store}>{store}</option>
                   ))}
                   <option value="custom">その他（手入力）</option>
@@ -382,12 +426,9 @@ function MealRecord({ onBack, onSave, editingRecord }) {
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
               >
-                <option value="現金">現金</option>
-                <option value="クレジットカード">クレジットカード</option>
-                <option value="電子マネー">電子マネー</option>
-                <option value="交通系IC">交通系IC</option>
-                <option value="QRコード決済">QRコード決済</option>
-                <option value="デビットカード">デビットカード</option>
+                {paymentMethods.map(method => (
+                  <option key={method} value={method}>{method}</option>
+                ))}
               </select>
             </div>
           </div>
