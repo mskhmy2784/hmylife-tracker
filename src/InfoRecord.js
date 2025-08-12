@@ -254,10 +254,37 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
             <span className="location-status">{getLocationStatus()}</span>
           </div>
           {currentLocation && useLocationInfo && (
-            <div className="location-details">
-              緯度: {currentLocation.latitude.toFixed(6)}, 
-              経度: {currentLocation.longitude.toFixed(6)}
-              {currentLocation.accuracy && ` (精度: ${Math.round(currentLocation.accuracy)}m)`}
+            <div className="location-info">
+              <div className="location-details">
+                <strong>📍 座標:</strong> {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+                {currentLocation.accuracy && ` (精度: ${Math.round(currentLocation.accuracy)}m)`}
+              </div>
+              {currentLocation.address && (
+                <div className="address-details">
+                  <div className="address-success">
+                    <strong>🏠 住所:</strong> {
+                      currentLocation.address.state && currentLocation.address.city && currentLocation.address.road
+                        ? `${currentLocation.address.state}${currentLocation.address.city}${currentLocation.address.road}`
+                        : currentLocation.address.fullAddress
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {locationError && useLocationInfo && (
+            <div className="location-error">
+              ❌ {locationError}
+              <button 
+                className="retry-btn"
+                onClick={() => {
+                  setLocationError(null);
+                  setUseLocationInfo(false);
+                  setTimeout(() => setUseLocationInfo(true), 100);
+                }}
+              >
+                再試行
+              </button>
             </div>
           )}
         </div>
