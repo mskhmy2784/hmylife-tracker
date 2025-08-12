@@ -20,7 +20,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
   const [paymentLocationInput, setPaymentLocationInput] = useState('');
   const [isCustomPaymentLocation, setIsCustomPaymentLocation] = useState(false);
   const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('現金');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [memo, setMemo] = useState('');
   
@@ -83,6 +83,13 @@ function MealRecord({ onBack, onSave, editingRecord }) {
     };
   }, []);
 
+  // 支払方法の初期値設定
+  useEffect(() => {
+    if (paymentMethods.length > 0 && !paymentMethod && !editingRecord) {
+      setPaymentMethod(paymentMethods[0]);
+    }
+  }, [paymentMethods, paymentMethod, editingRecord]);
+
   // 編集時のデータ初期化
   useEffect(() => {
     if (editingRecord) {
@@ -96,12 +103,12 @@ function MealRecord({ onBack, onSave, editingRecord }) {
       setPaymentLocationInput('');
       setIsCustomPaymentLocation(false);
       setAmount(editingRecord.amount ? editingRecord.amount.toString() : '');
-      setPaymentMethod(editingRecord.paymentMethod || '現金');
+      setPaymentMethod(editingRecord.paymentMethod || (paymentMethods.length > 0 ? paymentMethods[0] : '現金'));
       setUseLocationInfo(editingRecord.useLocationInfo !== false);
       setMemo(editingRecord.memo || '');
       setPhotos(editingRecord.photos || []); // 既存の写真を読み込み
     }
-  }, [editingRecord]);
+  }, [editingRecord, paymentMethods]);
 
   // デフォルトカロリー設定
   const defaultCalories = {
