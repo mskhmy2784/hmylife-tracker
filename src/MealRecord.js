@@ -40,10 +40,18 @@ function MealRecord({ onBack, onSave, editingRecord }) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // マスタデータの状態
-  const [paymentLocations, setPaymentLocations] = useState([]);
-  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [masterPaymentLocations, setMasterPaymentLocations] = useState([]);
+  const [masterPaymentMethods, setMasterPaymentMethods] = useState([]);
 
-  // マスタデータの読み込み
+  // デフォルトカロリー設定
+  const [defaultCalories, setDefaultCalories] = useState({
+    '朝食': 500,
+    '昼食': 700,
+    '夕食': 600,
+    '間食': 200
+  });
+
+  // マスタデータとデフォルトカロリーの読み込み
   useEffect(() => {
     // デフォルトカロリー設定の読み込み
     const loadDefaultCalories = async () => {
@@ -63,12 +71,12 @@ function MealRecord({ onBack, onSave, editingRecord }) {
       query(collection(db, 'masterData', 'paymentLocations', 'items'), orderBy('name')),
       (snapshot) => {
         const items = snapshot.docs.map(doc => doc.data().name);
-        setPaymentLocations(items);
+        setMasterPaymentLocations(items);
       },
       (error) => {
         console.error('支払先マスタ読み込みエラー:', error);
         // エラー時はデフォルト値を使用
-        setPaymentLocations([
+        setMasterPaymentLocations([
           'ファミリーマート',
           'セブンイレブン', 
           'ローソン',
@@ -85,12 +93,12 @@ function MealRecord({ onBack, onSave, editingRecord }) {
       query(collection(db, 'masterData', 'paymentMethods', 'items'), orderBy('name')),
       (snapshot) => {
         const items = snapshot.docs.map(doc => doc.data().name);
-        setPaymentMethods(items);
+        setMasterPaymentMethods(items);
       },
       (error) => {
         console.error('支払方法マスタ読み込みエラー:', error);
         // エラー時はデフォルト値を使用
-        setPaymentMethods([
+        setMasterPaymentMethods([
           '現金',
           'クレジットカード',
           '電子マネー',
@@ -109,10 +117,10 @@ function MealRecord({ onBack, onSave, editingRecord }) {
 
   // 支払方法の初期値設定
   useEffect(() => {
-    if (paymentMethods.length > 0 && !paymentMethod && !editingRecord) {
-      setPaymentMethod(paymentMethods[0]);
+    if (masterPaymentMethods.length > 0 && !paymentMethod && !editingRecord) {
+      setPaymentMethod(masterPaymentMethods[0]);
     }
-  }, [paymentMethods, paymentMethod, editingRecord]);
+  }, [masterPaymentMethods, paymentMethod, editingRecord]);
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -127,20 +135,12 @@ function MealRecord({ onBack, onSave, editingRecord }) {
       setPaymentLocationInput('');
       setIsCustomPaymentLocation(false);
       setAmount(editingRecord.amount ? editingRecord.amount.toString() : '');
-      setPaymentMethod(editingRecord.paymentMethod || (paymentMethods.length > 0 ? paymentMethods[0] : '現金'));
+      setPaymentMethod(editingRecord.paymentMethod || (masterPaymentMethods.length > 0 ? masterPaymentMethods[0] : '現金'));
       setUseLocationInfo(editingRecord.useLocationInfo !== false);
       setMemo(editingRecord.memo || '');
-      setPhotos(editingRecord.photos || []); // 既存の写真を読み込み
+      setPhotos(editingRecord.photos || []);
     }
-  }, [editingRecord, paymentMethods]);
-
-  // デフォルトカロリー設定
-  const defaultCalories = {
-    '朝食': 500,
-    '昼食': 700,
-    '夕食': 600,
-    '間食': 200
-  };
+  }, [editingRecord, masterPaymentMethods]);
 
   // 写真撮影・選択処理
   const handlePhotoCapture = async (event) => {
@@ -243,7 +243,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
         paymentMethod: isExternalMeal ? paymentMethod : '',
         useLocationInfo: useLocationInfo,
         memo: memo,
-        photos: photos, // 写真データを追加
+        photos: photos,
         createdAt: editingRecord ? editingRecord.createdAt : new Date(),
         date: new Date().toDateString()
       };
@@ -447,7 +447,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
                   }}
                 >
                   <option value="">選択してください</option>
-                  {paymentLocations.map(store => (
+                  {masterPaymentLocations.map(store => (
                     <option key={store} value={store}>{store}</option>
                   ))}
                   <option value="custom">その他（手入力）</option>
@@ -481,7 +481,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
               >
-                {paymentMethods.map(method => (
+                {masterPaymentMethods.map(method => (
                   <option key={method} value={method}>{method}</option>
                 ))}
               </select>
