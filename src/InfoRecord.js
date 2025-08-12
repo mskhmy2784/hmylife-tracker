@@ -21,16 +21,49 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
   const [locationError, setLocationError] = useState(null);
   const [memo, setMemo] = useState('');
 
-  // 位置情報取得
+  // 位置情報取得（住所情報付き）
   useEffect(() => {
     if (useLocationInfo && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCurrentLocation({
+        async (position) => {
+          const locationData = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy
-          });
+            accuracy: position.coords.accuracy,
+            timestamp: new Date().toISOString()
+          };
+          
+          // 住所情報を取得
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${locationData.latitude}&lon=${locationData.longitude}&zoom=18&addressdetails=1&accept-language=ja`,
+              {
+                headers: {
+                  'User-Agent': 'LifeTracker/1.0'
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data && data.display_name) {
+                const addressInfo = {
+                  fullAddress: data.display_name,
+                  road: data.address?.road || '',
+                  city: data.address?.city || data.address?.town || data.address?.village || '',
+                  state: data.address?.state || '',
+                  country: data.address?.country || '',
+                  postcode: data.address?.postcode || ''
+                };
+                
+                locationData.address = addressInfo;
+              }
+            }
+          } catch (error) {
+            console.error('住所取得エラー:', error);
+          }
+          
+          setCurrentLocation(locationData);
           setLocationError(null);
         },
         (error) => {
@@ -187,43 +220,40 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
           </div>
         </div>
 
-        {/* 情報内容 */}
+        {/* 内容 */}
         <div className="form-group">
-          <label>情報内容:</label>
+          <label>{infoType}内容:</label>
           <textarea
             value={infoContent}
             onChange={(e) => setInfoContent(e.target.value)}
-            placeholder="メモまたはTODOの内容"
+            placeholder={infoType === 'TODO' ? 'やることを入力してください' : 'メモ内容を入力してください'}
             rows="4"
+            required
           />
         </div>
 
-        {/* TODO専用項目 */}
+        {/* TODO固有の項目 */}
         {infoType === 'TODO' && (
-          <div className="todo-specific">
-            {/* 期限 - 1行に統合 */}
-            <div className="form-group">
-              <label>期限 (任意):</label>
-              <div className="due-date-time-row">
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  placeholder="日付"
-                />
-                <input
-                  type="time"
-                  value={dueTime}
-                  onChange={(e) => setDueTime(e.target.value)}
-                  placeholder="時刻"
-                />
-              </div>
+          <div className="form-group">
+            <label>期限設定:</label>
+            <div className="due-date-inputs">
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                placeholder="期限日 (任意)"
+              />
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                placeholder="期限時刻 (任意)"
+              />
             </div>
-
-            {/* 完了状況 - 1行に統合 */}
-            <div className="form-group">
-              <div className="completion-row">
-                <label>完了状況:</label>
+            
+            <div className="completion-group">
+              <label>完了状況:</label>
+              <div className="completion-switch">
                 <span className={`status-label ${!isCompleted ? 'active' : ''}`}>未完了</span>
                 <label className="switch">
                   <input
