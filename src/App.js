@@ -68,7 +68,8 @@ function App() {
     
     // 睡眠時間の計算（最新の記録を使用）
     const sleepRecord = records.find(r => r.category === '睡眠');
-    const sleepHours = sleepRecord ? sleepRecord.sleepHours + (sleepRecord.sleepMinutes / 60) : 0;
+    const sleepHours = sleepRecord ? 
+      sleepRecord.sleepHours + (sleepRecord.sleepMinutes / 60) : 0;
     
     // 運動記録から消費カロリーと運動時間を計算
     const totalCaloriesBurn = records
@@ -183,7 +184,8 @@ function App() {
         break;
       case '支出':
         icon = '💰';
-        content = `${record.paymentLocation} ¥${record.amount.toLocaleString()} ${record.expenseContent}`;
+        const expensePhotoText = record.photos && record.photos.length > 0 ? ` 📷${record.photos.length}枚` : '';
+        content = `${record.paymentLocation} ¥${record.amount.toLocaleString()} ${record.expenseContent}${expensePhotoText}`;
         break;
       case '計量':
         icon = '⚖️';
@@ -233,26 +235,16 @@ function App() {
         icon = '📝';
         const priorityIcon = record.priority === '重要' ? '🔴' : record.priority === '低' ? '🟢' : '🟡';
         const typeText = record.infoType;
-        
-        // TODOの完了状況をより明確に表示
-        let completionStatus = '';
-        if (record.infoType === 'TODO') {
-          if (record.isCompleted) {
-            completionStatus = ' ✅完了';
-            icon = '✅'; // TODOが完了している場合はアイコンも変更
-          } else {
-            completionStatus = ' ⏳未完了';
-          }
-        }
-        
+        const completionText = record.infoType === 'TODO' && record.isCompleted ? ' ✅' : '';
         const dueDateText = record.dueDate ? ` (${record.dueDate}期限)` : '';
+        const infoPhotoText = record.photos && record.photos.length > 0 ? ` 📷${record.photos.length}枚` : '';
         
         // 情報内容の最初の50文字のみ表示
         const shortContent = record.infoContent.length > 50 ? 
           record.infoContent.substring(0, 50) + '...' : 
           record.infoContent;
         
-        content = `${priorityIcon} [${typeText}] ${shortContent}${dueDateText}${completionStatus}`;
+        content = `${priorityIcon} [${typeText}] ${shortContent}${dueDateText}${completionText}${infoPhotoText}`;
         break;
       // 今後他のカテゴリも追加
       default:
@@ -386,16 +378,16 @@ function App() {
         ) : (
           <div className="timeline-list">
             {records.map((record) => {
-              const formatted = formatRecord(record);
+              const { time, content, icon } = formatRecord(record);
               return (
-                <div 
-                  key={record.id} 
-                  className="timeline-item clickable" 
+                <div
+                  key={record.id}
+                  className="timeline-item clickable"
                   onClick={() => handleEdit(record)}
                 >
-                  <span className="timeline-time">{formatted.time}</span>
-                  <span className="timeline-icon">{formatted.icon}</span>
-                  <span className="timeline-text">{formatted.content}</span>
+                  <div className="timeline-time">{time}</div>
+                  <div className="timeline-icon">{icon}</div>
+                  <div className="timeline-text">{content}</div>
                 </div>
               );
             })}
