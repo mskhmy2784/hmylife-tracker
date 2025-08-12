@@ -2,14 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { 
   doc, 
-  getDoc, 
   setDoc, 
   onSnapshot,
   collection,
   query,
   where,
   getDocs,
-  deleteDoc,
   writeBatch 
 } from 'firebase/firestore';
 
