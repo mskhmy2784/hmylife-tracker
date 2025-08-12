@@ -4,7 +4,13 @@ import {
   doc, 
   getDoc, 
   setDoc, 
-  onSnapshot 
+  onSnapshot,
+  collection,
+  query,
+  where,
+  getDocs,
+  deleteDoc,
+  writeBatch 
 } from 'firebase/firestore';
 
 function PersonalSettingsScreen({ onBack }) {
@@ -28,6 +34,11 @@ function PersonalSettingsScreen({ onBack }) {
   // 通知設定
   const [enableNotifications, setEnableNotifications] = useState(true);
   const [notificationTime, setNotificationTime] = useState('22:00');
+
+  // データ管理関連
+  const [deleteDate, setDeleteDate] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteStats, setDeleteStats] = useState(null);
 
   const personalSettingsDocId = 'user_personal_settings';
 
@@ -74,6 +85,137 @@ function PersonalSettingsScreen({ onBack }) {
     };
     
     return Math.round(bmr * (activityMultiplier[activityLevel] || 1.375));
+  };
+
+  // データ削除統計の取得
+  const getDeleteStats = async (fromDate) => {
+    if (!fromDate) return null;
+
+    try {
+      const targetDate = new Date(fromDate);
+      const targetDateString = targetDate.toDateString();
+      
+      // 指定日付以降のレコードを検索
+      const q = query(
+        collection(db, 'records'),
+        where('date', '>=', targetDateString)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const records = [];
+      querySnapshot.forEach((doc) => {
+        records.push({ id: doc.id, ...doc.data() });
+      });
+
+      // カテゴリ別の統計を計算
+      const categoryStats = {};
+      records.forEach(record => {
+        const category = record.category || '未分類';
+        categoryStats[category] = (categoryStats[category] || 0) + 1;
+      });
+
+      return {
+        totalCount: records.length,
+        categoryStats,
+        dateRange: {
+          from: fromDate,
+          to: new Date().toISOString().split('T')[0]
+        }
+      };
+    } catch (error) {
+      console.error('削除統計取得エラー:', error);
+      return null;
+    }
+  };
+
+  // 削除プレビューの更新
+  useEffect(() => {
+    if (deleteDate) {
+      getDeleteStats(deleteDate).then(setDeleteStats);
+    } else {
+      setDeleteStats(null);
+    }
+  }, [deleteDate]);
+
+  // 特定日付以降のデータ削除
+  const handleDeleteDataFromDate = async () => {
+    if (!deleteDate) {
+      alert('削除開始日を選択してください');
+      return;
+    }
+
+    const stats = await getDeleteStats(deleteDate);
+    if (!stats || stats.totalCount === 0) {
+      alert('削除対象のデータがありません');
+      return;
+    }
+
+    const confirmMessage = `${deleteDate}以降のデータ（${stats.totalCount}件）を削除しますか？\n\nこの操作は元に戻せません。`;
+    
+    if (!window.confirm(confirmMessage)) return;
+
+    // 最終確認
+    const finalConfirm = window.prompt(
+      '本当に削除しますか？\n削除を実行する場合は「削除」と入力してください',
+      ''
+    );
+    
+    if (finalConfirm !== '削除') {
+      alert('削除がキャンセルされました');
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const targetDate = new Date(deleteDate);
+      const targetDateString = targetDate.toDateString();
+      
+      // 削除対象のレコードを取得
+      const q = query(
+        collection(db, 'records'),
+        where('date', '>=', targetDateString)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        alert('削除対象のデータがありません');
+        return;
+      }
+
+      // バッチ削除（Firestoreの制限により500件ずつ処理）
+      const batch = writeBatch(db);
+      let batchCount = 0;
+      let totalDeleted = 0;
+
+      for (const docSnapshot of querySnapshot.docs) {
+        batch.delete(docSnapshot.ref);
+        batchCount++;
+        totalDeleted++;
+
+        // 500件に達したらバッチをコミット
+        if (batchCount >= 500) {
+          await batch.commit();
+          batchCount = 0;
+        }
+      }
+
+      // 残りのバッチをコミット
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+
+      alert(`${totalDeleted}件のデータを削除しました`);
+      setDeleteDate('');
+      setDeleteStats(null);
+
+    } catch (error) {
+      console.error('データ削除エラー:', error);
+      alert('データの削除に失敗しました: ' + error.message);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // データ読み込み
@@ -331,6 +473,55 @@ function PersonalSettingsScreen({ onBack }) {
               </div>
             </div>
           )}
+        </div>
+
+        {/* データ管理セクション */}
+        <div className="settings-section">
+          <h3>🗑️ データ管理</h3>
+          
+          <div className="form-group">
+            <label>特定日付以降のデータを削除:</label>
+            <div className="delete-date-section">
+              <input
+                type="date"
+                value={deleteDate}
+                onChange={(e) => setDeleteDate(e.target.value)}
+                placeholder="削除開始日を選択"
+                max={new Date().toISOString().split('T')[0]}
+              />
+              
+              {deleteStats && (
+                <div className="delete-preview">
+                  <h4>削除プレビュー</h4>
+                  <p><strong>削除対象期間:</strong> {deleteStats.dateRange.from} 〜 {deleteStats.dateRange.to}</p>
+                  <p><strong>削除件数:</strong> {deleteStats.totalCount}件</p>
+                  
+                  {Object.keys(deleteStats.categoryStats).length > 0 && (
+                    <div className="category-breakdown">
+                      <strong>カテゴリ別内訳:</strong>
+                      <ul>
+                        {Object.entries(deleteStats.categoryStats).map(([category, count]) => (
+                          <li key={category}>{category}: {count}件</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <button 
+                className="delete-data-btn"
+                onClick={handleDeleteDataFromDate}
+                disabled={!deleteDate || isDeleting || !deleteStats || deleteStats.totalCount === 0}
+              >
+                {isDeleting ? '削除中...' : '指定日以降のデータを削除'}
+              </button>
+              
+              <div className="delete-warning">
+                ⚠️ 削除されたデータは復元できません。十分にご注意ください。
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
