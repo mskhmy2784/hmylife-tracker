@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, doc, setDoc, getDoc, addDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, addDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs, writeBatch } from 'firebase/firestore';
 
 function SettingsScreen({ onBack }) {
   // ユーザー基本情報
@@ -21,6 +21,14 @@ function SettingsScreen({ onBack }) {
 
   // 現在選択中のタブ
   const [activeTab, setActiveTab] = useState('userInfo');
+
+  // データ削除関連の状態
+  const [deleteDate, setDeleteDate] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [recordCounts, setRecordCounts] = useState({
+    total: 0,
+    targetDate: 0
+  });
 
   // ユーザー基本情報の読み込み
   useEffect(() => {
@@ -75,6 +83,45 @@ function SettingsScreen({ onBack }) {
       unsubscribeLocations();
     };
   }, []);
+
+  // 記録件数の取得
+  useEffect(() => {
+    const getRecordCounts = async () => {
+      try {
+        // 全記録数を取得
+        const allRecordsSnapshot = await getDocs(collection(db, 'records'));
+        const totalCount = allRecordsSnapshot.size;
+
+        let targetCount = 0;
+        if (deleteDate) {
+          // 指定日付以前の記録数を取得
+          const targetDateObj = new Date(deleteDate);
+          const targetDateString = targetDateObj.toDateString();
+          
+          // 指定日以前のデータを検索
+          const beforeDate = new Date(targetDateObj);
+          beforeDate.setDate(beforeDate.getDate() + 1); // 指定日の翌日
+          const beforeDateString = beforeDate.toDateString();
+          
+          const targetRecords = allRecordsSnapshot.docs.filter(doc => {
+            const recordDate = doc.data().date;
+            return recordDate < beforeDateString;
+          });
+          
+          targetCount = targetRecords.length;
+        }
+
+        setRecordCounts({
+          total: totalCount,
+          targetDate: targetCount
+        });
+      } catch (error) {
+        console.error('記録件数取得エラー:', error);
+      }
+    };
+
+    getRecordCounts();
+  }, [deleteDate]);
 
   // 年齢計算
   const calculateAge = () => {
@@ -201,6 +248,66 @@ function SettingsScreen({ onBack }) {
     }
   };
 
+  // レコード削除処理
+  const handleDeleteRecords = async () => {
+    if (!deleteDate) {
+      alert('削除する日付を選択してください');
+      return;
+    }
+
+    if (recordCounts.targetDate === 0) {
+      alert('削除対象のレコードがありません');
+      return;
+    }
+
+    const confirmMessage = `${deleteDate}以前のレコード ${recordCounts.targetDate}件を削除しますか？\n\nこの操作は取り消すことができません。`;
+    const confirmed = window.confirm(confirmMessage);
+    
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      // 指定日付以前の記録を取得
+      const targetDateObj = new Date(deleteDate);
+      const beforeDate = new Date(targetDateObj);
+      beforeDate.setDate(beforeDate.getDate() + 1); // 指定日の翌日
+      const beforeDateString = beforeDate.toDateString();
+
+      const allRecordsSnapshot = await getDocs(collection(db, 'records'));
+      const recordsToDelete = allRecordsSnapshot.docs.filter(doc => {
+        const recordDate = doc.data().date;
+        return recordDate < beforeDateString;
+      });
+
+      // バッチ処理で削除（Firestoreの制限で500件ずつ処理）
+      const batchSize = 500;
+      const batches = [];
+      
+      for (let i = 0; i < recordsToDelete.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const batchRecords = recordsToDelete.slice(i, i + batchSize);
+        
+        batchRecords.forEach(record => {
+          batch.delete(record.ref);
+        });
+        
+        batches.push(batch);
+      }
+
+      // すべてのバッチを実行
+      await Promise.all(batches.map(batch => batch.commit()));
+
+      alert(`${recordCounts.targetDate}件のレコードを削除しました`);
+      setDeleteDate('');
+      
+    } catch (error) {
+      console.error('レコード削除エラー:', error);
+      alert('レコードの削除に失敗しました');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="settings-screen">
       <div className="record-header">
@@ -222,6 +329,12 @@ function SettingsScreen({ onBack }) {
           onClick={() => setActiveTab('masterData')}
         >
           マスタデータ
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'dataManagement' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dataManagement')}
+        >
+          データ管理
         </button>
       </div>
 
@@ -395,6 +508,79 @@ function SettingsScreen({ onBack }) {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* データ管理タブ */}
+        {activeTab === 'dataManagement' && (
+          <div className="data-management-section">
+            {/* 記録統計 */}
+            <div className="data-stats">
+              <h3>📊 記録統計</h3>
+              <div className="stats-info">
+                <div className="stat-item">
+                  <span className="stat-label">総記録数:</span>
+                  <span className="stat-value">{recordCounts.total}件</span>
+                </div>
+              </div>
+            </div>
+
+            {/* レコード削除機能 */}
+            <div className="data-delete-section">
+              <h3>🗑️ レコード削除</h3>
+              <div className="delete-warning">
+                ⚠️ 指定した日付以前のすべてのレコードが削除されます。この操作は取り消すことができません。
+              </div>
+              
+              <div className="delete-form">
+                <div className="form-group">
+                  <label>削除する日付を選択:</label>
+                  <input
+                    type="date"
+                    value={deleteDate}
+                    onChange={(e) => setDeleteDate(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]} // 今日まで
+                  />
+                  <div className="delete-help">
+                    選択した日付以前のレコードがすべて削除されます
+                  </div>
+                </div>
+
+                {deleteDate && (
+                  <div className="delete-preview">
+                    <div className="preview-info">
+                      <strong>{deleteDate}以前のレコード: {recordCounts.targetDate}件</strong>が削除されます
+                    </div>
+                    {recordCounts.targetDate > 0 && (
+                      <div className="delete-details">
+                        • 削除後の残りレコード数: {recordCounts.total - recordCounts.targetDate}件
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="delete-action">
+                  <button
+                    className="delete-records-btn"
+                    onClick={handleDeleteRecords}
+                    disabled={!deleteDate || recordCounts.targetDate === 0 || isDeleting}
+                  >
+                    {isDeleting ? '削除中...' : `${recordCounts.targetDate}件のレコードを削除`}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 注意事項 */}
+            <div className="data-notes">
+              <h4>注意事項</h4>
+              <ul>
+                <li>削除されたレコードは復元できません</li>
+                <li>写真ファイルも同時に削除されます</li>
+                <li>削除処理には時間がかかる場合があります</li>
+                <li>削除前に必要なデータはバックアップしてください</li>
+              </ul>
             </div>
           </div>
         )}
