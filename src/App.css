@@ -1983,3 +1983,66 @@ input:checked + .slider:before {
 .link-button:hover {
   color: #45a049;
 }
+/* ヘッダーボタン用スタイル（App.cssに追加してください） */
+
+.header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.logout-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* タイムライン項目のクリック可能スタイル */
+.timeline-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 8px;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.timeline-item:hover {
+  background-color: #f0f0f0;
+}
+
+.timeline-time {
+  font-weight: bold;
+  color: #666;
+  min-width: 60px;
+  font-size: 14px;
+}
+
+.timeline-icon {
+  margin: 0 10px;
+  font-size: 18px;
+}
+
+.timeline-content {
+  flex: 1;
+  font-size: 14px;
+  color: #333;
+}
+
+.timeline-empty {
+  text-align: center;
+  color: #999;
+  font-style: italic;
+  padding: 30px;
+}
