@@ -52,17 +52,6 @@ function SettingsScreen({ onBack }) {
     }
   };
 
-  const setCurrentData = (data) => {
-    if (activeTab === 'personal') return;
-    switch (activeTab) {
-      case 'stores': setStores(data); break;
-      case 'exercise': setExerciseTypes(data); break;
-      case 'locations': setLocations(data); break;
-      case 'transport': setTransportMethods(data); break;
-      default: setStores(data); break;
-    }
-  };
-
   // データ読み込み
   useEffect(() => {
     if (activeTab === 'personal') {
@@ -85,7 +74,17 @@ function SettingsScreen({ onBack }) {
           data.push({ id: doc.id, ...doc.data() });
         });
         
-        setCurrentData(data);
+        // activeTabに基づいて直接setStateを呼び出し
+        if (activeTab === 'stores') {
+          setStores(data);
+        } else if (activeTab === 'exercise') {
+          setExerciseTypes(data);
+        } else if (activeTab === 'locations') {
+          setLocations(data);
+        } else if (activeTab === 'transport') {
+          setTransportMethods(data);
+        }
+        
         setLoading(false);
       },
       (error) => {
@@ -95,7 +94,7 @@ function SettingsScreen({ onBack }) {
     );
 
     return () => unsubscribe();
-  }, [activeTab, getCurrentCollection, setCurrentData]);
+  }, [activeTab]); // activeTabのみに依存
 
   // アイテム追加
   const handleAddItem = async () => {
