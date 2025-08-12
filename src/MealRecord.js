@@ -63,16 +63,49 @@ function MealRecord({ onBack, onSave, editingRecord }) {
     }
   };
 
-  // 位置情報取得
+  // 位置情報取得（住所情報付き）
   useEffect(() => {
     if (useLocationInfo && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCurrentLocation({
+        async (position) => {
+          const locationData = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy
-          });
+            accuracy: position.coords.accuracy,
+            timestamp: new Date().toISOString()
+          };
+          
+          // 住所情報を取得
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${locationData.latitude}&lon=${locationData.longitude}&zoom=18&addressdetails=1&accept-language=ja`,
+              {
+                headers: {
+                  'User-Agent': 'LifeTracker/1.0'
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data && data.display_name) {
+                const addressInfo = {
+                  fullAddress: data.display_name,
+                  road: data.address?.road || '',
+                  city: data.address?.city || data.address?.town || data.address?.village || '',
+                  state: data.address?.state || '',
+                  country: data.address?.country || '',
+                  postcode: data.address?.postcode || ''
+                };
+                
+                locationData.address = addressInfo;
+              }
+            }
+          } catch (error) {
+            console.error('住所取得エラー:', error);
+          }
+          
+          setCurrentLocation(locationData);
         },
         (error) => {
           console.error('位置情報取得エラー:', error);
@@ -389,10 +422,22 @@ function MealRecord({ onBack, onSave, editingRecord }) {
             </span>
           </div>
           {currentLocation && useLocationInfo && (
-            <div className="location-details">
-              緯度: {currentLocation.latitude.toFixed(6)}, 
-              経度: {currentLocation.longitude.toFixed(6)}
-              {currentLocation.accuracy && ` (精度: ${Math.round(currentLocation.accuracy)}m)`}
+            <div className="location-info">
+              <div className="location-details">
+                <strong>📍 座標:</strong> {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+                {currentLocation.accuracy && ` (精度: ${Math.round(currentLocation.accuracy)}m)`}
+              </div>
+              {currentLocation.address && (
+                <div className="address-details">
+                  <div className="address-success">
+                    <strong>🏠 住所:</strong> {
+                      currentLocation.address.state && currentLocation.address.city && currentLocation.address.road
+                        ? `${currentLocation.address.state}${currentLocation.address.city}${currentLocation.address.road}`
+                        : currentLocation.address.fullAddress
+                    }
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
