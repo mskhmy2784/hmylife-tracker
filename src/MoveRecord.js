@@ -35,6 +35,7 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('交通系IC');
   const [useLocationInfo, setUseLocationInfo] = useState(true);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [memo, setMemo] = useState('');
   const [errors, setErrors] = useState({});
 
@@ -76,6 +77,65 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
     '京王電鉄',
     'バス会社'
   ];
+
+  // 位置情報取得（住所情報付き）
+  useEffect(() => {
+    if (useLocationInfo && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const locationData = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: new Date().toISOString()
+          };
+          
+          // 住所情報を取得
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${locationData.latitude}&lon=${locationData.longitude}&zoom=18&addressdetails=1&accept-language=ja`,
+              {
+                headers: {
+                  'User-Agent': 'LifeTracker/1.0'
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data && data.display_name) {
+                const addressInfo = {
+                  fullAddress: data.display_name,
+                  road: data.address?.road || '',
+                  city: data.address?.city || data.address?.town || data.address?.village || '',
+                  state: data.address?.state || '',
+                  country: data.address?.country || '',
+                  postcode: data.address?.postcode || ''
+                };
+                
+                locationData.address = addressInfo;
+              }
+            }
+          } catch (error) {
+            console.error('住所取得エラー:', error);
+          }
+          
+          setCurrentLocation(locationData);
+        },
+        (error) => {
+          console.error('位置情報取得エラー:', error);
+          setCurrentLocation(null);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000
+        }
+      );
+    } else if (!useLocationInfo) {
+      setCurrentLocation(null);
+    }
+  }, [useLocationInfo]);
 
   // マスタデータ読み込み
   useEffect(() => {
@@ -231,6 +291,7 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
         amount: hasPayment ? parseInt(amount) || 0 : 0,
         paymentMethod: hasPayment ? paymentMethod : '',
         useLocationInfo: useLocationInfo,
+        location: useLocationInfo && currentLocation ? currentLocation : null,
         memo: memo,
         createdAt: editingRecord ? editingRecord.createdAt : new Date(),
         updatedAt: new Date(),
@@ -519,16 +580,40 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
 
         {/* 位置情報・メモ */}
         <div className="form-group">
-          <div className="checkbox-group">
-            <input
-              type="checkbox"
-              id="useLocationInfo"
-              checked={useLocationInfo}
-              onChange={(e) => setUseLocationInfo(e.target.checked)}
-            />
-            <label htmlFor="useLocationInfo">位置情報を記録</label>
-            <span className="location-status">📍現在地取得中...</span>
+          <div className="location-switch-row">
+            <label>位置情報を記録:</label>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={useLocationInfo}
+                onChange={(e) => setUseLocationInfo(e.target.checked)}
+              />
+              <span className="slider"></span>
+            </label>
+            <span className="location-status">
+              {!useLocationInfo ? '' :
+               currentLocation ? '✅ 位置情報取得完了' : '📍 位置情報取得中...'}
+            </span>
           </div>
+          {currentLocation && useLocationInfo && (
+            <div className="location-info">
+              <div className="location-details">
+                <strong>📍 座標:</strong> {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+                {currentLocation.accuracy && ` (精度: ${Math.round(currentLocation.accuracy)}m)`}
+              </div>
+              {currentLocation.address && (
+                <div className="address-details">
+                  <div className="address-success">
+                    <strong>🏠 住所:</strong> {
+                      currentLocation.address.state && currentLocation.address.city && currentLocation.address.road
+                        ? `${currentLocation.address.state}${currentLocation.address.city}${currentLocation.address.road}`
+                        : currentLocation.address.fullAddress
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="form-group">
