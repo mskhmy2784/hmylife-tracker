@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db } from './firebase';
+import { db, storage } from './firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 function ExpenseRecord({ onBack, onSave, editingRecord }) {
   const [recordTime, setRecordTime] = useState(() => {
@@ -18,7 +19,10 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
   const [paymentMethod, setPaymentMethod] = useState('現金');
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [memo, setMemo] = useState('');
-  const [errors, setErrors] = useState({});
+  
+  // 写真関連の状態を追加
+  const [photos, setPhotos] = useState([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // よく使う店舗のマスタデータ（今後はFirestoreから取得）
   const commonStores = [
@@ -44,51 +48,83 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
       setPaymentMethod(editingRecord.paymentMethod || '現金');
       setUseLocationInfo(editingRecord.useLocationInfo !== false);
       setMemo(editingRecord.memo || '');
+      setPhotos(editingRecord.photos || []); // 既存の写真を読み込み
     }
   }, [editingRecord]);
 
-  // バリデーション
-  const validateForm = () => {
-    const newErrors = {};
+  // 写真撮影・選択処理
+  const handlePhotoCapture = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
 
-    // 支払先チェック
-    const finalPaymentLocation = isCustomPaymentLocation ? paymentLocationInput : paymentLocation;
-    if (!finalPaymentLocation.trim()) {
-      newErrors.paymentLocation = '支払先を入力してください';
+    setUploadingPhoto(true);
+    try {
+      // ファイル名を生成（日時 + ランダム文字列）
+      const timestamp = new Date().getTime();
+      const randomId = Math.random().toString(36).substring(2, 15);
+      const fileName = `expense-photos/${timestamp}_${randomId}.jpg`;
+      
+      // Firebase Storage にアップロード
+      const imageRef = ref(storage, fileName);
+      await uploadBytes(imageRef, file);
+      
+      // ダウンロードURLを取得
+      const downloadURL = await getDownloadURL(imageRef);
+      
+      // 写真リストに追加
+      setPhotos(prev => [...prev, {
+        url: downloadURL,
+        fileName: fileName,
+        uploadedAt: new Date()
+      }]);
+      
+      alert('写真をアップロードしました！');
+    } catch (error) {
+      console.error('写真アップロードエラー:', error);
+      alert('写真のアップロードに失敗しました');
+    } finally {
+      setUploadingPhoto(false);
+      // input要素をリセット（同じファイルを再選択可能にする）
+      event.target.value = '';
     }
+  };
 
-    // 支出内容チェック
-    if (!expenseContent.trim()) {
-      newErrors.expenseContent = '支出内容を入力してください';
+  // 写真削除処理
+  const handlePhotoDelete = async (photoIndex) => {
+    const photo = photos[photoIndex];
+    if (!photo) return;
+
+    const confirmDelete = window.confirm('この写真を削除しますか？');
+    if (!confirmDelete) return;
+
+    try {
+      // Firebase Storage から削除
+      const imageRef = ref(storage, photo.fileName);
+      await deleteObject(imageRef);
+      
+      // 状態から削除
+      setPhotos(prev => prev.filter((_, index) => index !== photoIndex));
+      
+      alert('写真を削除しました');
+    } catch (error) {
+      console.error('写真削除エラー:', error);
+      alert('写真の削除に失敗しました');
     }
-
-    // 金額チェック
-    const amountNum = parseInt(amount);
-    if (!amount || amountNum < 1) {
-      newErrors.amount = '金額は1円以上で入力してください';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
   // 保存処理
   const handleSave = async () => {
-    if (!validateForm()) {
-      alert('入力内容に不備があります。エラーメッセージを確認してください。');
-      return;
-    }
-
     try {
       const expenseData = {
         category: '支出',
         recordTime: recordTime,
         paymentLocation: isCustomPaymentLocation ? paymentLocationInput : paymentLocation,
         expenseContent: expenseContent,
-        amount: parseInt(amount),
+        amount: parseInt(amount) || 0,
         paymentMethod: paymentMethod,
         useLocationInfo: useLocationInfo,
         memo: memo,
+        photos: photos, // 写真データを追加
         createdAt: editingRecord ? editingRecord.createdAt : new Date(),
         date: new Date().toDateString()
       };
@@ -116,6 +152,16 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
     if (!confirmDelete) return;
 
     try {
+      // 関連する写真もStorage から削除
+      for (const photo of photos) {
+        try {
+          const imageRef = ref(storage, photo.fileName);
+          await deleteObject(imageRef);
+        } catch (error) {
+          console.warn('写真削除エラー:', error);
+        }
+      }
+      
       await deleteDoc(doc(db, 'records', editingRecord.id));
       alert('支出記録を削除しました');
       onSave();
@@ -146,8 +192,8 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
 
         {/* 支払先 */}
         <div className="form-group">
-          <label>支払先: <span className="required">*</span></label>
-          <div className="store-selection">
+          <label>支払先:</label>
+          <div className="location-selection">
             <select
               value={isCustomPaymentLocation ? 'custom' : paymentLocation}
               onChange={(e) => {
@@ -158,72 +204,47 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
                   setIsCustomPaymentLocation(false);
                   setPaymentLocation(e.target.value);
                 }
-                if (errors.paymentLocation) {
-                  setErrors({...errors, paymentLocation: ''});
-                }
               }}
-              className={errors.paymentLocation ? 'error' : ''}
             >
-              <option value="">よく使う店舗を選択</option>
+              <option value="">選択してください</option>
               {commonStores.map(store => (
                 <option key={store} value={store}>{store}</option>
               ))}
-              <option value="custom">手入力で追加</option>
+              <option value="custom">その他（手入力）</option>
             </select>
             
             {isCustomPaymentLocation && (
               <input
                 type="text"
                 value={paymentLocationInput}
-                onChange={(e) => {
-                  setPaymentLocationInput(e.target.value);
-                  if (errors.paymentLocation) {
-                    setErrors({...errors, paymentLocation: ''});
-                  }
-                }}
+                onChange={(e) => setPaymentLocationInput(e.target.value)}
                 placeholder="店舗名を入力"
-                className={`custom-input ${errors.paymentLocation ? 'error' : ''}`}
+                style={{ marginTop: '5px' }}
               />
             )}
           </div>
-          {errors.paymentLocation && <span className="error-message">{errors.paymentLocation}</span>}
         </div>
 
         {/* 支出内容 */}
         <div className="form-group">
-          <label>支出内容: <span className="required">*</span></label>
+          <label>支出内容:</label>
           <input
             type="text"
             value={expenseContent}
-            onChange={(e) => {
-              setExpenseContent(e.target.value);
-              if (errors.expenseContent) {
-                setErrors({...errors, expenseContent: ''});
-              }
-            }}
+            onChange={(e) => setExpenseContent(e.target.value)}
             placeholder="購入した商品・サービス"
-            className={errors.expenseContent ? 'error' : ''}
           />
-          {errors.expenseContent && <span className="error-message">{errors.expenseContent}</span>}
         </div>
 
         {/* 金額 */}
         <div className="form-group">
-          <label>金額: <span className="required">*</span></label>
+          <label>金額:</label>
           <input
             type="number"
             value={amount}
-            onChange={(e) => {
-              setAmount(e.target.value);
-              if (errors.amount) {
-                setErrors({...errors, amount: ''});
-              }
-            }}
+            onChange={(e) => setAmount(e.target.value)}
             placeholder="円"
-            min="1"
-            className={errors.amount ? 'error' : ''}
           />
-          {errors.amount && <span className="error-message">{errors.amount}</span>}
         </div>
 
         {/* 支払方法 */}
@@ -240,6 +261,60 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
             <option value="QRコード決済">QRコード決済</option>
             <option value="デビットカード">デビットカード</option>
           </select>
+        </div>
+
+        {/* 写真撮影・選択 */}
+        <div className="form-group">
+          <label>写真（レシート・商品など）:</label>
+          <div className="photo-section">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handlePhotoCapture}
+              disabled={uploadingPhoto}
+              style={{ marginBottom: '10px' }}
+            />
+            {uploadingPhoto && <p>アップロード中...</p>}
+            
+            {/* 撮影済み写真の表示 */}
+            {photos.length > 0 && (
+              <div className="photos-grid">
+                {photos.map((photo, index) => (
+                  <div key={index} className="photo-item">
+                    <img 
+                      src={photo.url} 
+                      alt={`支出写真 ${index + 1}`}
+                      style={{
+                        width: '100px',
+                        height: '100px',
+                        objectFit: 'cover',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <button 
+                      className="photo-delete-btn"
+                      onClick={() => handlePhotoDelete(index)}
+                      style={{
+                        position: 'absolute',
+                        top: '5px',
+                        right: '5px',
+                        background: 'red',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '20px',
+                        height: '20px',
+                        fontSize: '12px'
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 位置情報・メモ */}
