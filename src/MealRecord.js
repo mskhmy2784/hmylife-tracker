@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, storage } from './firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 function MealRecord({ onBack, onSave, editingRecord }) {
@@ -11,7 +11,18 @@ function MealRecord({ onBack, onSave, editingRecord }) {
     return `${hours}:${minutes}`;
   });
   
-  const [mealType, setMealType] = useState('昼食');
+  // 時間に応じた食事種別のデフォルト設定
+  const getDefaultMealType = () => {
+    const now = new Date();
+    const hour = now.getHours();
+    
+    if (hour >= 5 && hour < 10) return '朝食';
+    if (hour >= 10 && hour < 15) return '昼食';
+    if (hour >= 15 && hour < 21) return '夕食';
+    return '間食';
+  };
+  
+  const [mealType, setMealType] = useState(getDefaultMealType());
   const [calories, setCalories] = useState('');
   const [useDefault, setUseDefault] = useState(false);
   const [mealContent, setMealContent] = useState('');
@@ -34,6 +45,19 @@ function MealRecord({ onBack, onSave, editingRecord }) {
 
   // マスタデータの読み込み
   useEffect(() => {
+    // デフォルトカロリー設定の読み込み
+    const loadDefaultCalories = async () => {
+      try {
+        const caloriesDoc = await getDoc(doc(db, 'settings', 'defaultCalories'));
+        if (caloriesDoc.exists()) {
+          setDefaultCalories(caloriesDoc.data());
+        }
+      } catch (error) {
+        console.error('デフォルトカロリー読み込みエラー:', error);
+      }
+    };
+    loadDefaultCalories();
+
     // 支払先の読み込み
     const unsubscribePaymentLocations = onSnapshot(
       query(collection(db, 'masterData', 'paymentLocations', 'items'), orderBy('name')),
@@ -180,6 +204,30 @@ function MealRecord({ onBack, onSave, editingRecord }) {
 
   // 保存処理
   const handleSave = async () => {
+    // バリデーション
+    if (!mealContent.trim()) {
+      alert('食事内容を入力してください');
+      return;
+    }
+
+    if (!useDefault && (!calories || parseInt(calories) <= 0)) {
+      alert('カロリーを正しく入力してください');
+      return;
+    }
+
+    if (isExternalMeal) {
+      const finalPaymentLocation = isCustomPaymentLocation ? paymentLocationInput : paymentLocation;
+      if (!finalPaymentLocation.trim()) {
+        alert('外食時は支払先を入力してください');
+        return;
+      }
+      
+      if (!amount || parseInt(amount) <= 0) {
+        alert('外食時は金額を正しく入力してください');
+        return;
+      }
+    }
+
     try {
       const finalCalories = useDefault ? defaultCalories[mealType] : parseInt(calories) || 0;
       
