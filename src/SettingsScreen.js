@@ -160,6 +160,9 @@ function SettingsScreen({ onBack }) {
         case 'location':
           setNewLocation('');
           break;
+        default:
+          // デフォルトケース - 何もしない
+          break;
       }
 
       alert('追加しました！');
