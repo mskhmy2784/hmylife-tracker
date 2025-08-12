@@ -10,9 +10,10 @@ import {
   doc, 
   orderBy 
 } from 'firebase/firestore';
+import PersonalSettingsScreen from './PersonalSettingsScreen';
 
 function SettingsScreen({ onBack }) {
-  const [activeTab, setActiveTab] = useState('stores');
+  const [activeTab, setActiveTab] = useState('personal');
   const [loading, setLoading] = useState(true);
   
   // マスタデータ
@@ -28,6 +29,7 @@ function SettingsScreen({ onBack }) {
 
   // マスタデータタブ設定
   const masterDataTabs = [
+    { id: 'personal', name: '個人設定', collection: null },
     { id: 'stores', name: '店舗', collection: 'master_stores' },
     { id: 'exercise', name: '運動種類', collection: 'master_exercise_types' },
     { id: 'locations', name: '場所', collection: 'master_locations' },
@@ -35,10 +37,12 @@ function SettingsScreen({ onBack }) {
   ];
 
   const getCurrentCollection = () => {
-    return masterDataTabs.find(tab => tab.id === activeTab)?.collection || 'master_stores';
+    const tab = masterDataTabs.find(tab => tab.id === activeTab);
+    return tab?.collection || 'master_stores';
   };
 
   const getCurrentData = () => {
+    if (activeTab === 'personal') return [];
     switch (activeTab) {
       case 'stores': return stores;
       case 'exercise': return exerciseTypes;
@@ -49,6 +53,7 @@ function SettingsScreen({ onBack }) {
   };
 
   const setCurrentData = (data) => {
+    if (activeTab === 'personal') return;
     switch (activeTab) {
       case 'stores': setStores(data); break;
       case 'exercise': setExerciseTypes(data); break;
@@ -59,6 +64,11 @@ function SettingsScreen({ onBack }) {
 
   // データ読み込み
   useEffect(() => {
+    if (activeTab === 'personal') {
+      setLoading(false);
+      return;
+    }
+    
     const collectionName = getCurrentCollection();
     console.log('データ読み込み開始:', collectionName);
     
@@ -207,7 +217,14 @@ function SettingsScreen({ onBack }) {
         ))}
       </div>
 
-      <div className="settings-content">
+      {/* 個人設定画面 */}
+      {activeTab === 'personal' && (
+        <PersonalSettingsScreen onBack={() => setActiveTab('stores')} />
+      )}
+
+      {/* マスタデータ管理画面 */}
+      {activeTab !== 'personal' && (
+        <div className="settings-content">
         {/* 新規追加 */}
         <div className="add-item-section">
           <h3>新しい{masterDataTabs.find(t => t.id === activeTab)?.name}を追加</h3>
