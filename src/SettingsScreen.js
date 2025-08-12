@@ -9,6 +9,15 @@ function SettingsScreen({ onBack }) {
   const [gender, setGender] = useState('male');
   const [userInfoSaving, setUserInfoSaving] = useState(false);
 
+  // デフォルトカロリー設定
+  const [defaultCalories, setDefaultCalories] = useState({
+    '朝食': 500,
+    '昼食': 700,
+    '夕食': 600,
+    '間食': 200
+  });
+  const [caloriesSaving, setCaloriesSaving] = useState(false);
+
   // マスタデータ
   const [paymentLocations, setPaymentLocations] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
@@ -40,6 +49,12 @@ function SettingsScreen({ onBack }) {
           setHeight(data.height || '');
           setBirthDate(data.birthDate || '');
           setGender(data.gender || 'male');
+        }
+
+        // デフォルトカロリー設定の読み込み
+        const caloriesDoc = await getDoc(doc(db, 'settings', 'defaultCalories'));
+        if (caloriesDoc.exists()) {
+          setDefaultCalories(caloriesDoc.data());
         }
       } catch (error) {
         console.error('ユーザー情報読み込みエラー:', error);
@@ -248,6 +263,20 @@ function SettingsScreen({ onBack }) {
     }
   };
 
+  // デフォルトカロリー設定の保存
+  const handleSaveDefaultCalories = async () => {
+    setCaloriesSaving(true);
+    try {
+      await setDoc(doc(db, 'settings', 'defaultCalories'), defaultCalories);
+      alert('デフォルトカロリー設定を保存しました！');
+    } catch (error) {
+      console.error('カロリー設定保存エラー:', error);
+      alert('保存に失敗しました');
+    } finally {
+      setCaloriesSaving(false);
+    }
+  };
+
   // レコード削除処理
   const handleDeleteRecords = async () => {
     if (!deleteDate) {
@@ -407,6 +436,40 @@ function SettingsScreen({ onBack }) {
               >
                 {userInfoSaving ? '保存中...' : '基本情報を保存'}
               </button>
+            </div>
+
+            {/* デフォルトカロリー設定 */}
+            <div className="calories-settings">
+              <h3>デフォルトカロリー設定</h3>
+              <div className="calories-grid">
+                {Object.entries(defaultCalories).map(([mealType, calories]) => (
+                  <div key={mealType} className="calorie-item">
+                    <label>{mealType}:</label>
+                    <div className="calorie-input">
+                      <input
+                        type="number"
+                        value={calories}
+                        onChange={(e) => setDefaultCalories(prev => ({
+                          ...prev,
+                          [mealType]: parseInt(e.target.value) || 0
+                        }))}
+                        min="0"
+                        max="2000"
+                      />
+                      <span>kcal</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="save-section">
+                <button 
+                  className="save-btn-large"
+                  onClick={handleSaveDefaultCalories}
+                  disabled={caloriesSaving}
+                >
+                  {caloriesSaving ? '保存中...' : 'カロリー設定を保存'}
+                </button>
+              </div>
             </div>
           </div>
         )}
