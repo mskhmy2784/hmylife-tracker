@@ -1,994 +1,403 @@
-.App {
-  max-width: 400px;
-  margin: 0 auto;
-  background-color: #f5f5f5;
-  min-height: 100vh;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-/* ヘッダー */
-.app-header {
-  background-color: #4CAF50;
-  color: white;
-  padding: 15px;
-  text-align: center;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.app-header h1 {
-  margin: 0;
-  font-size: 1.5em;
-}
-
-.settings-btn {
-  position: absolute;
-  right: 15px;
-  background: none;
-  border: none;
-  color: white;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 5px 8px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.settings-btn:hover {
-  background-color: rgba(255,255,255,0.1);
-}
-
-/* 記録ボタン */
-.record-buttons {
-  padding: 20px 15px;
-  background-color: white;
-  margin: 10px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.button-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.button-row:last-child {
-  margin-bottom: 0;
-}
-
-.record-btn {
-  flex: 1;
-  margin: 0 5px;
-  padding: 15px 5px;
-  border: none;
-  border-radius: 8px;
-  background-color: #e3f2fd;
-  font-size: 12px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  min-height: 60px;
-}
-
-.record-btn:hover {
-  background-color: #bbdefb;
-}
-
-.record-btn.empty {
-  background-color: transparent;
-  cursor: default;
-}
-
-.record-btn.empty:hover {
-  background-color: transparent;
-}
-
-/* 日付選択 */
-.date-selector {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 15px;
-  background-color: white;
-  margin: 0 10px 10px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.date-arrow {
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 5px 15px;
-  color: #666;
-}
-
-.date-arrow:hover {
-  color: #333;
-  background-color: #f0f0f0;
-  border-radius: 4px;
-}
-
-.current-date {
-  font-size: 16px;
-  font-weight: bold;
-  margin: 0 20px;
-  min-width: 150px;
-  text-align: center;
-}
-
-/* その日の概要 */
-.daily-summary {
-  background-color: white;
-  margin: 0 10px 10px;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.summary-item {
-  margin: 8px 0;
-  font-size: 14px;
-  color: #333;
-}
-
-/* 時系列一覧 */
-.timeline {
-  background-color: white;
-  margin: 0 10px 10px;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  min-height: 200px;
-}
-
-.timeline h3 {
-  margin-top: 0;
-  margin-bottom: 15px;
-  color: #333;
-  font-size: 16px;
-}
-
-.timeline-empty {
-  text-align: center;
-  color: #999;
-  font-style: italic;
-  padding: 50px 20px;
-}
-
-.timeline-loading {
-  text-align: center;
-  color: #666;
-  padding: 50px 20px;
-}
-
-.timeline-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.timeline-item {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-  background-color: #f9f9f9;
-  border-radius: 6px;
-  border-left: 4px solid #4CAF50;
-  gap: 10px;
-}
-
-.timeline-item.clickable {
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.timeline-item.clickable:hover {
-  background-color: #f0f0f0;
-}
-
-.timeline-time {
-  font-weight: bold;
-  color: #333;
-  min-width: 50px;
-  font-size: 13px;
-}
-
-.timeline-icon {
-  font-size: 16px;
-  min-width: 20px;
-}
-
-.timeline-text {
-  color: #555;
-  font-size: 13px;
-  line-height: 1.4;
-  flex: 1;
-}
-
-/* 記録画面共通スタイル */
-.meal-record, .sleep-record, .expense-record, .measurement-record, 
-.exercise-record, .move-record, .info-record {
-  background-color: #f5f5f5;
-  min-height: 100vh;
-}
-
-.record-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #4CAF50;
-  color: white;
-  padding: 15px;
-}
-
-.record-header h2 {
-  margin: 0;
-  font-size: 1.2em;
-}
-
-.back-btn, .save-btn {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 5px 10px;
-}
-
-.back-btn:hover, .save-btn:hover {
-  background-color: rgba(255,255,255,0.1);
-  border-radius: 4px;
-}
-
-.record-form {
-  padding: 20px 15px;
-}
-
-.form-group {
-  margin-bottom: 20px;
-  background-color: white;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: bold;
-  color: #333;
-}
-
-.form-group input[type="time"],
-.form-group input[type="number"],
-.form-group input[type="text"],
-.form-group input[type="date"],
-.form-group select,
-.form-group textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 16px;
-  box-sizing: border-box;
-}
-
-.form-group textarea {
-  resize: vertical;
-  font-family: inherit;
-}
-
-/* バリデーション用スタイル */
-.required {
-  color: #f44336;
-  font-weight: bold;
-}
-
-.error {
-  border-color: #f44336 !important;
-  background-color: #ffeaea !important;
-}
-
-.error-message {
-  display: block;
-  color: #f44336;
-  font-size: 12px;
-  margin-top: 5px;
-  font-weight: normal;
-}
-
-.sleep-duration.error {
-  border-color: #f44336;
-  background-color: #ffeaea;
-}
-
-/* 食事種別ボタン */
-.meal-type-buttons, .info-type-buttons {
-  display: flex;
-  gap: 10px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-
-.type-btn {
-  flex: 1;
-  padding: 10px 15px;
-  border: 2px solid #ddd;
-  background-color: white;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 80px;
-}
-
-.type-btn.active {
-  background-color: #4CAF50;
-  color: white;
-  border-color: #4CAF50;
-}
-
-.type-btn:hover {
-  border-color: #4CAF50;
-}
-
-/* 優先度ボタン */
-.priority-buttons {
-  display: flex;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.priority-btn {
-  flex: 1;
-  padding: 10px 15px;
-  border: 2px solid #ddd;
-  background-color: white;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.priority-btn.active {
-  background-color: #4CAF50;
-  color: white;
-  border-color: #4CAF50;
-}
-
-.priority-btn:hover {
-  border-color: #4CAF50;
-}
-
-/* チェックボックス */
-.checkbox-group {
-  display: flex;
-  align-items: center;
-  margin-top: 10px;
-  gap: 8px;
-}
-
-.checkbox-group input[type="checkbox"] {
-  width: auto;
-  margin: 0;
-}
-
-.checkbox-group label {
-  margin: 0;
-  font-weight: normal;
-  cursor: pointer;
-}
-
-.location-status {
-  margin-left: 10px;
-  color: #666;
-  font-size: 14px;
-}
-
-/* カロリー入力 */
-.calories-input {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* スイッチ関連 */
-.switch-group {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.toggle-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 60px;
-  height: 34px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: .4s;
-  border-radius: 34px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 26px;
-  width: 26px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  transition: .4s;
-  border-radius: 50%;
-}
-
-input:checked + .slider {
-  background-color: #4CAF50;
-}
-
-input:checked + .slider:before {
-  transform: translateX(26px);
-}
-
-/* 外食情報 */
-.external-meal-section, .payment-info, .todo-section {
-  margin-top: 15px;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-radius: 6px;
-  border-left: 4px solid #4CAF50;
-}
-
-/* 店舗選択・場所選択 */
-.location-selection {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* 写真関連のスタイル */
-.photo-section {
-  border: 1px solid #ddd;
-  padding: 15px;
-  border-radius: 8px;
-  background-color: #f9f9f9;
-}
-
-.photos-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.photo-item {
-  position: relative;
-  display: inline-block;
-}
-
-.photo-delete-btn {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  background: #ff4444;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.photo-delete-btn:hover {
-  background: #cc0000;
-}
-
-input[type="file"] {
-  margin-bottom: 10px;
-}
-
-/* 削除ボタン */
-.delete-section {
-  padding: 20px 15px;
-  text-align: center;
-}
-
-.delete-btn {
-  background-color: #f44336;
-  color: white;
-  border: none;
-  padding: 12px 30px;
-  border-radius: 6px;
-  font-size: 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.delete-btn:hover {
-  background-color: #d32f2f;
-}
-
-/* 睡眠記録専用スタイル */
-.sleep-note {
-  font-size: 12px;
-  color: #666;
-  margin-top: 5px;
-  font-style: italic;
-}
-
-.sleep-duration {
-  font-size: 18px;
-  font-weight: bold;
-  color: #4CAF50;
-  padding: 15px;
-  background-color: #f0f8f0;
-  border-radius: 6px;
-  text-align: center;
-  border: 2px solid #e8f5e8;
-}
-
-/* 計量記録専用スタイル */
-.bmi-display {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 15px;
-  background-color: #f0f8f0;
-  border-radius: 6px;
-  border: 2px solid #e8f5e8;
-}
-
-.bmi-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #4CAF50;
-}
-
-.bmi-category {
-  font-size: 16px;
-  color: #666;
-}
-
-.bmi-note {
-  font-size: 12px;
-  color: #666;
-  margin-top: 5px;
-  font-style: italic;
-}
-
-.blood-pressure-inputs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.blood-pressure-inputs input {
-  width: 80px;
-  flex: none;
-}
-
-.separator {
-  font-size: 18px;
-  font-weight: bold;
-  color: #666;
-}
-
-.unit {
-  font-size: 14px;
-  color: #666;
-  margin-left: 5px;
-}
-
-/* 運動記録専用スタイル */
-.exercise-data-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-  margin-top: 10px;
-}
-
-.data-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.data-item label {
-  font-size: 14px;
-  margin-bottom: 5px;
-  color: #555;
-  font-weight: bold;
-}
-
-.data-item input {
-  margin-top: 0;
-}
-
-/* 移動記録専用スタイル */
-.duration-display {
-  font-size: 16px;
-  font-weight: bold;
-  color: #4CAF50;
-  padding: 10px;
-  background-color: #f0f8f0;
-  border-radius: 6px;
-  text-align: center;
-  border: 2px solid #e8f5e8;
-}
-
-/* 情報記録専用スタイル */
-.due-date-input {
-  display: flex;
-  gap: 10px;
-}
-
-.due-date-input input {
-  flex: 1;
-}
-
-.completion-toggle {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.status-label {
-  font-size: 14px;
-  color: #999;
-  transition: all 0.2s;
-}
-
-.status-label.active {
-  font-weight: bold;
-  color: #4CAF50;
-}
-
-/* 管理画面のスタイル */
-.settings-screen {
-  background-color: #f5f5f5;
-  min-height: 100vh;
-}
-
-.tab-menu {
-  display: flex;
-  background-color: white;
-  margin: 0 10px;
-  border-radius: 8px 8px 0 0;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.tab-btn {
-  flex: 1;
-  padding: 15px;
-  border: none;
-  background-color: #f0f0f0;
-  color: #666;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.tab-btn.active {
-  background-color: #4CAF50;
-  color: white;
-}
-
-.tab-btn:hover:not(.active) {
-  background-color: #e0e0e0;
-}
-
-.settings-content {
-  background-color: white;
-  margin: 0 10px 10px;
-  padding: 20px;
-  border-radius: 0 0 8px 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  min-height: calc(100vh - 200px);
-}
-
-/* ユーザー基本情報セクション */
-.user-info-section .form-group {
-  margin-bottom: 25px;
-}
-
-.gender-buttons {
-  display: flex;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.gender-btn {
-  flex: 1;
-  padding: 12px 20px;
-  border: 2px solid #ddd;
-  background-color: white;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 16px;
-}
-
-.gender-btn.active {
-  background-color: #4CAF50;
-  color: white;
-  border-color: #4CAF50;
-}
-
-.gender-btn:hover:not(.active) {
-  border-color: #4CAF50;
-}
-
-.info-display {
-  margin-top: 8px;
-  padding: 10px;
-  background-color: #e8f5e9;
-  border-radius: 4px;
-  color: #2e7d32;
-  font-weight: bold;
-}
-
-.calculation-results {
-  background-color: #f8f9fa;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  padding: 20px;
-  margin: 25px 0;
-}
-
-.calculation-results h3 {
-  margin: 0 0 15px 0;
-  color: #333;
-  font-size: 18px;
-}
-
-.result-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #e9ecef;
-}
-
-.result-item:last-child {
-  border-bottom: none;
-}
-
-.result-label {
-  font-weight: bold;
-  color: #555;
-}
-
-.result-value {
-  font-size: 18px;
-  font-weight: bold;
-  color: #4CAF50;
-}
-
-.result-note {
-  margin-top: 15px;
-  font-size: 12px;
-  color: #666;
-  font-style: italic;
-  line-height: 1.4;
-}
-
-.save-section {
-  text-align: center;
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
-}
-
-.save-btn-large {
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  padding: 15px 40px;
-  border-radius: 8px;
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.save-btn-large:hover:not(:disabled) {
-  background-color: #45a049;
-}
-
-.save-btn-large:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-/* マスタデータセクション */
-.master-data-section {
-  display: flex;
-  flex-direction: column;
-  gap: 30px;
-}
-
-.master-category {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.master-category h3 {
-  margin: 0;
-  padding: 15px 20px;
-  background-color: #f8f9fa;
-  color: #333;
-  font-size: 16px;
-  border-bottom: 1px solid #ddd;
-}
-
-.add-item-form {
-  display: flex;
-  gap: 10px;
-  padding: 15px 20px;
-  background-color: #fafafa;
-  border-bottom: 1px solid #ddd;
-}
-
-.add-item-form input {
-  flex: 1;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.add-btn {
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: bold;
-  transition: background-color 0.2s;
-}
-
-.add-btn:hover {
-  background-color: #45a049;
-}
-
-.master-list {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.master-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 20px;
-  border-bottom: 1px solid #eee;
-  transition: background-color 0.2s;
-}
-
-.master-item:hover {
-  background-color: #f8f9fa;
-}
-
-.master-item:last-child {
-  border-bottom: none;
-}
-
-.item-name {
-  flex: 1;
-  color: #333;
-  font-size: 14px;
-}
-
-.delete-item-btn {
-  background-color: #f44336;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: background-color 0.2s;
-}
-
-.delete-item-btn:hover {
-  background-color: #d32f2f;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 480px) {
-  .tab-btn {
-    padding: 12px 8px;
-    font-size: 14px;
-  }
+import React, { useState, useEffect } from 'react';
+import { db } from './firebase';
+import { collection, doc, setDoc, getDoc, addDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+
+function SettingsScreen({ onBack }) {
+  // ユーザー基本情報
+  const [height, setHeight] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [gender, setGender] = useState('male');
+  const [userInfoSaving, setUserInfoSaving] = useState(false);
+
+  // マスタデータ
+  const [paymentLocations, setPaymentLocations] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [locations, setLocations] = useState([]);
   
-  .gender-buttons {
-    flex-direction: column;
-  }
-  
-  .result-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
-  }
-  
-  .add-item-form {
-    flex-direction: column;
-  }
-  
-  .master-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .delete-item-btn {
-    align-self: flex-end;
-  }
+  // 新規追加用の入力値
+  const [newPaymentLocation, setNewPaymentLocation] = useState('');
+  const [newPaymentMethod, setNewPaymentMethod] = useState('');
+  const [newLocation, setNewLocation] = useState('');
+
+  // 現在選択中のタブ
+  const [activeTab, setActiveTab] = useState('userInfo');
+
+  // ユーザー基本情報の読み込み
+  useEffect(() => {
+    const loadUserInfo = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'settings', 'userInfo'));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setHeight(data.height || '');
+          setBirthDate(data.birthDate || '');
+          setGender(data.gender || 'male');
+        }
+      } catch (error) {
+        console.error('ユーザー情報読み込みエラー:', error);
+      }
+    };
+    loadUserInfo();
+  }, []);
+
+  // マスタデータの読み込み
+  useEffect(() => {
+    // 支払先の読み込み
+    const unsubscribePaymentLocations = onSnapshot(
+      query(collection(db, 'masterData', 'paymentLocations', 'items'), orderBy('name')),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setPaymentLocations(items);
+      }
+    );
+
+    // 支払方法の読み込み
+    const unsubscribePaymentMethods = onSnapshot(
+      query(collection(db, 'masterData', 'paymentMethods', 'items'), orderBy('name')),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setPaymentMethods(items);
+      }
+    );
+
+    // 場所の読み込み
+    const unsubscribeLocations = onSnapshot(
+      query(collection(db, 'masterData', 'locations', 'items'), orderBy('name')),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setLocations(items);
+      }
+    );
+
+    return () => {
+      unsubscribePaymentLocations();
+      unsubscribePaymentMethods();
+      unsubscribeLocations();
+    };
+  }, []);
+
+  // 年齢計算
+  const calculateAge = () => {
+    if (!birthDate) return 0;
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  // 基礎代謝計算（Harris-Benedict式）
+  const calculateBMR = () => {
+    if (!height || !birthDate) return 0;
+    const age = calculateAge();
+    const heightNum = parseFloat(height);
+    
+    if (gender === 'male') {
+      // 男性: BMR = 88.362 + (13.397 × 体重kg) + (4.799 × 身長cm) - (5.677 × 年齢)
+      // 体重は仮で65kgとして計算（実際の体重は計量記録から取得する想定）
+      return Math.round(88.362 + (13.397 * 65) + (4.799 * heightNum) - (5.677 * age));
+    } else {
+      // 女性: BMR = 447.593 + (9.247 × 体重kg) + (3.098 × 身長cm) - (4.330 × 年齢)
+      return Math.round(447.593 + (9.247 * 55) + (3.098 * heightNum) - (4.330 * age));
+    }
+  };
+
+  // ユーザー基本情報の保存
+  const handleSaveUserInfo = async () => {
+    setUserInfoSaving(true);
+    try {
+      await setDoc(doc(db, 'settings', 'userInfo'), {
+        height: parseFloat(height) || 0,
+        birthDate: birthDate,
+        gender: gender,
+        updatedAt: new Date()
+      });
+      alert('ユーザー情報を保存しました！');
+    } catch (error) {
+      console.error('保存エラー:', error);
+      alert('保存に失敗しました');
+    } finally {
+      setUserInfoSaving(false);
+    }
+  };
+
+  // マスタデータの追加
+  const handleAddMasterData = async (type, value) => {
+    if (!value.trim()) return;
+    
+    try {
+      let collectionPath = '';
+      switch (type) {
+        case 'paymentLocation':
+          collectionPath = 'masterData/paymentLocations/items';
+          break;
+        case 'paymentMethod':
+          collectionPath = 'masterData/paymentMethods/items';
+          break;
+        case 'location':
+          collectionPath = 'masterData/locations/items';
+          break;
+        default:
+          return;
+      }
+
+      await addDoc(collection(db, collectionPath), {
+        name: value.trim(),
+        createdAt: new Date()
+      });
+
+      // 入力フィールドをクリア
+      switch (type) {
+        case 'paymentLocation':
+          setNewPaymentLocation('');
+          break;
+        case 'paymentMethod':
+          setNewPaymentMethod('');
+          break;
+        case 'location':
+          setNewLocation('');
+          break;
+      }
+
+      alert('追加しました！');
+    } catch (error) {
+      console.error('追加エラー:', error);
+      alert('追加に失敗しました');
+    }
+  };
+
+  // マスタデータの削除
+  const handleDeleteMasterData = async (type, id, name) => {
+    const confirmDelete = window.confirm(`「${name}」を削除しますか？`);
+    if (!confirmDelete) return;
+
+    try {
+      let collectionPath = '';
+      switch (type) {
+        case 'paymentLocation':
+          collectionPath = 'masterData/paymentLocations/items';
+          break;
+        case 'paymentMethod':
+          collectionPath = 'masterData/paymentMethods/items';
+          break;
+        case 'location':
+          collectionPath = 'masterData/locations/items';
+          break;
+        default:
+          return;
+      }
+
+      await deleteDoc(doc(db, collectionPath, id));
+      alert('削除しました');
+    } catch (error) {
+      console.error('削除エラー:', error);
+      alert('削除に失敗しました');
+    }
+  };
+
+  return (
+    <div className="settings-screen">
+      <div className="record-header">
+        <button className="back-btn" onClick={onBack}>←</button>
+        <h2>管理画面</h2>
+        <div></div>
+      </div>
+
+      {/* タブメニュー */}
+      <div className="tab-menu">
+        <button 
+          className={`tab-btn ${activeTab === 'userInfo' ? 'active' : ''}`}
+          onClick={() => setActiveTab('userInfo')}
+        >
+          基本情報
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'masterData' ? 'active' : ''}`}
+          onClick={() => setActiveTab('masterData')}
+        >
+          マスタデータ
+        </button>
+      </div>
+
+      <div className="settings-content">
+        {/* ユーザー基本情報タブ */}
+        {activeTab === 'userInfo' && (
+          <div className="user-info-section">
+            <div className="form-group">
+              <label>身長 (cm):</label>
+              <input
+                type="number"
+                step="0.1"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                placeholder="例: 170.5"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>生年月日:</label>
+              <input
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+              />
+              {birthDate && (
+                <div className="info-display">
+                  現在の年齢: {calculateAge()}歳
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>性別:</label>
+              <div className="gender-buttons">
+                <button
+                  className={`gender-btn ${gender === 'male' ? 'active' : ''}`}
+                  onClick={() => setGender('male')}
+                >
+                  男性
+                </button>
+                <button
+                  className={`gender-btn ${gender === 'female' ? 'active' : ''}`}
+                  onClick={() => setGender('female')}
+                >
+                  女性
+                </button>
+              </div>
+            </div>
+
+            {/* 計算結果表示 */}
+            {height && birthDate && (
+              <div className="calculation-results">
+                <h3>計算結果</h3>
+                <div className="result-item">
+                  <span className="result-label">基礎代謝:</span>
+                  <span className="result-value">{calculateBMR()} kcal/日</span>
+                </div>
+                <div className="result-note">
+                  ※基礎代謝は標準体重での概算値です。正確な値は体重測定後に再計算されます。
+                </div>
+              </div>
+            )}
+
+            <div className="save-section">
+              <button 
+                className="save-btn-large"
+                onClick={handleSaveUserInfo}
+                disabled={userInfoSaving}
+              >
+                {userInfoSaving ? '保存中...' : '基本情報を保存'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* マスタデータタブ */}
+        {activeTab === 'masterData' && (
+          <div className="master-data-section">
+            {/* 支払先管理 */}
+            <div className="master-category">
+              <h3>支払先・店舗</h3>
+              <div className="add-item-form">
+                <input
+                  type="text"
+                  value={newPaymentLocation}
+                  onChange={(e) => setNewPaymentLocation(e.target.value)}
+                  placeholder="新しい支払先を入力"
+                />
+                <button 
+                  className="add-btn"
+                  onClick={() => handleAddMasterData('paymentLocation', newPaymentLocation)}
+                >
+                  追加
+                </button>
+              </div>
+              <div className="master-list">
+                {paymentLocations.map(item => (
+                  <div key={item.id} className="master-item">
+                    <span className="item-name">{item.name}</span>
+                    <button 
+                      className="delete-item-btn"
+                      onClick={() => handleDeleteMasterData('paymentLocation', item.id, item.name)}
+                    >
+                      削除
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 支払方法管理 */}
+            <div className="master-category">
+              <h3>支払方法</h3>
+              <div className="add-item-form">
+                <input
+                  type="text"
+                  value={newPaymentMethod}
+                  onChange={(e) => setNewPaymentMethod(e.target.value)}
+                  placeholder="新しい支払方法を入力"
+                />
+                <button 
+                  className="add-btn"
+                  onClick={() => handleAddMasterData('paymentMethod', newPaymentMethod)}
+                >
+                  追加
+                </button>
+              </div>
+              <div className="master-list">
+                {paymentMethods.map(item => (
+                  <div key={item.id} className="master-item">
+                    <span className="item-name">{item.name}</span>
+                    <button 
+                      className="delete-item-btn"
+                      onClick={() => handleDeleteMasterData('paymentMethod', item.id, item.name)}
+                    >
+                      削除
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 場所管理 */}
+            <div className="master-category">
+              <h3>場所（移動先・移動元など）</h3>
+              <div className="add-item-form">
+                <input
+                  type="text"
+                  value={newLocation}
+                  onChange={(e) => setNewLocation(e.target.value)}
+                  placeholder="新しい場所を入力"
+                />
+                <button 
+                  className="add-btn"
+                  onClick={() => handleAddMasterData('location', newLocation)}
+                >
+                  追加
+                </button>
+              </div>
+              <div className="master-list">
+                {locations.map(item => (
+                  <div key={item.id} className="master-item">
+                    <span className="item-name">{item.name}</span>
+                    <button 
+                      className="delete-item-btn"
+                      onClick={() => handleDeleteMasterData('location', item.id, item.name)}
+                    >
+                      削除
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
-/* レスポンシブ対応 */
-@media (max-width: 480px) {
-  .record-btn {
-    font-size: 11px;
-    padding: 12px 3px;
-    min-height: 55px;
-  }
-  
-  .current-date {
-    font-size: 14px;
-    min-width: 120px;
-  }
-
-  .exercise-data-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .blood-pressure-inputs {
-    flex-wrap: wrap;
-  }
-
-  .due-date-input {
-    flex-direction: column;
-  }
-
-  .photos-grid {
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  }
-
-  .meal-type-buttons, .info-type-buttons {
-    flex-direction: column;
-  }
-
-  .type-btn {
-    min-width: auto;
-  }
-}
+export default SettingsScreen;
