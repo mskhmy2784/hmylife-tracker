@@ -25,8 +25,8 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // マスタデータの状態
-  const [paymentLocations, setPaymentLocations] = useState([]);
-  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [masterPaymentLocations, setMasterPaymentLocations] = useState([]);
+  const [masterPaymentMethods, setMasterPaymentMethods] = useState([]);
 
   // マスタデータの読み込み
   useEffect(() => {
@@ -35,12 +35,12 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
       query(collection(db, 'masterData', 'paymentLocations', 'items'), orderBy('name')),
       (snapshot) => {
         const items = snapshot.docs.map(doc => doc.data().name);
-        setPaymentLocations(items);
+        setMasterPaymentLocations(items);
       },
       (error) => {
         console.error('支払先マスタ読み込みエラー:', error);
         // エラー時はデフォルト値を使用
-        setPaymentLocations([
+        setMasterPaymentLocations([
           'ファミリーマート',
           'セブンイレブン', 
           'ローソン',
@@ -58,12 +58,12 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
       query(collection(db, 'masterData', 'paymentMethods', 'items'), orderBy('name')),
       (snapshot) => {
         const items = snapshot.docs.map(doc => doc.data().name);
-        setPaymentMethods(items);
+        setMasterPaymentMethods(items);
       },
       (error) => {
         console.error('支払方法マスタ読み込みエラー:', error);
         // エラー時はデフォルト値を使用
-        setPaymentMethods([
+        setMasterPaymentMethods([
           '現金',
           'クレジットカード',
           '電子マネー',
@@ -82,10 +82,10 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
 
   // 支払方法の初期値設定
   useEffect(() => {
-    if (paymentMethods.length > 0 && !paymentMethod && !editingRecord) {
-      setPaymentMethod(paymentMethods[0]);
+    if (masterPaymentMethods.length > 0 && !paymentMethod && !editingRecord) {
+      setPaymentMethod(masterPaymentMethods[0]);
     }
-  }, [paymentMethods, paymentMethod, editingRecord]);
+  }, [masterPaymentMethods, paymentMethod, editingRecord]);
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -96,12 +96,12 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
       setIsCustomPaymentLocation(false);
       setExpenseContent(editingRecord.expenseContent || '');
       setAmount(editingRecord.amount ? editingRecord.amount.toString() : '');
-      setPaymentMethod(editingRecord.paymentMethod || (paymentMethods.length > 0 ? paymentMethods[0] : '現金'));
+      setPaymentMethod(editingRecord.paymentMethod || (masterPaymentMethods.length > 0 ? masterPaymentMethods[0] : '現金'));
       setUseLocationInfo(editingRecord.useLocationInfo !== false);
       setMemo(editingRecord.memo || '');
-      setPhotos(editingRecord.photos || []); // 既存の写真を読み込み
+      setPhotos(editingRecord.photos || []);
     }
-  }, [editingRecord, paymentMethods]);
+  }, [editingRecord, masterPaymentMethods]);
 
   // 写真撮影・選択処理
   const handlePhotoCapture = async (event) => {
@@ -175,7 +175,7 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
         paymentMethod: paymentMethod,
         useLocationInfo: useLocationInfo,
         memo: memo,
-        photos: photos, // 写真データを追加
+        photos: photos,
         createdAt: editingRecord ? editingRecord.createdAt : new Date(),
         date: new Date().toDateString()
       };
@@ -258,7 +258,7 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
               }}
             >
               <option value="">選択してください</option>
-              {commonStores.map(store => (
+              {masterPaymentLocations.map(store => (
                 <option key={store} value={store}>{store}</option>
               ))}
               <option value="custom">その他（手入力）</option>
@@ -305,7 +305,7 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
             value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.target.value)}
           >
-            {paymentMethods.map(method => (
+            {masterPaymentMethods.map(method => (
               <option key={method} value={method}>{method}</option>
             ))}
           </select>
