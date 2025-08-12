@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 function MoveRecord({ onBack, onSave, editingRecord }) {
   const [startTime, setStartTime] = useState(() => {
@@ -29,19 +29,12 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
   const [memo, setMemo] = useState('');
   const [errors, setErrors] = useState({});
 
-  // よく使う場所のマスタデータ（今後はFirestoreから取得）
-  const commonLocations = [
-    '自宅',
-    '職場',
-    '最寄り駅',
-    '新宿駅',
-    '渋谷駅',
-    '東京駅',
-    'スーパー',
-    'ジム'
-  ];
+  // マスタデータの状態
+  const [locations, setLocations] = useState([]);
+  const [paymentLocations, setPaymentLocations] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
-  // 移動手段のマスタデータ（今後はFirestoreから取得）
+  // 移動手段のマスタデータ（固定値）
   const transportMethods = [
     '徒歩',
     '電車',
@@ -53,16 +46,78 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
     'その他'
   ];
 
-  // 交通事業者のマスタデータ（今後はFirestoreから取得）
-  const transportCompanies = [
-    'JR東日本',
-    '東京メトロ',
-    '都営地下鉄',
-    '東急電鉄',
-    '小田急電鉄',
-    '京王電鉄',
-    'バス会社'
-  ];
+  // マスタデータの読み込み
+  useEffect(() => {
+    // 場所の読み込み
+    const unsubscribeLocations = onSnapshot(
+      query(collection(db, 'masterData', 'locations', 'items'), orderBy('name')),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => doc.data().name);
+        setLocations(items);
+      },
+      (error) => {
+        console.error('場所マスタ読み込みエラー:', error);
+        // エラー時はデフォルト値を使用
+        setLocations([
+          '自宅',
+          '職場',
+          '最寄り駅',
+          '新宿駅',
+          '渋谷駅',
+          '東京駅',
+          'スーパー',
+          'ジム'
+        ]);
+      }
+    );
+
+    // 支払先の読み込み（交通費支払い用）
+    const unsubscribePaymentLocations = onSnapshot(
+      query(collection(db, 'masterData', 'paymentLocations', 'items'), orderBy('name')),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => doc.data().name);
+        setPaymentLocations(items);
+      },
+      (error) => {
+        console.error('支払先マスタ読み込みエラー:', error);
+        // エラー時はデフォルト値を使用
+        setPaymentLocations([
+          'JR東日本',
+          '東京メトロ',
+          '都営地下鉄',
+          '東急電鉄',
+          '小田急電鉄',
+          '京王電鉄',
+          'バス会社'
+        ]);
+      }
+    );
+
+    // 支払方法の読み込み
+    const unsubscribePaymentMethods = onSnapshot(
+      query(collection(db, 'masterData', 'paymentMethods', 'items'), orderBy('name')),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => doc.data().name);
+        setPaymentMethods(items);
+      },
+      (error) => {
+        console.error('支払方法マスタ読み込みエラー:', error);
+        // エラー時はデフォルト値を使用
+        setPaymentMethods([
+          '交通系IC',
+          '現金',
+          'クレジットカード',
+          'その他'
+        ]);
+      }
+    );
+
+    return () => {
+      unsubscribeLocations();
+      unsubscribePaymentLocations();
+      unsubscribePaymentMethods();
+    };
+  }, []);
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -303,11 +358,11 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
               }}
               className={errors.fromLocation ? 'error' : ''}
             >
-              <option value="">よく使う場所を選択</option>
-              {commonLocations.map(location => (
+              <option value="">選択してください</option>
+              {locations.map(location => (
                 <option key={location} value={location}>{location}</option>
               ))}
-              <option value="custom">手入力で追加</option>
+              <option value="custom">その他（手入力）</option>
             </select>
             
             {isCustomFromLocation && (
@@ -320,8 +375,9 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
                     setErrors({...errors, fromLocation: ''});
                   }
                 }}
-                placeholder="場所名を入力"
-                className={`custom-input ${errors.fromLocation ? 'error' : ''}`}
+                placeholder="移動元を入力"
+                className={errors.fromLocation ? 'error' : ''}
+                style={{ marginTop: '5px' }}
               />
             )}
           </div>
@@ -348,11 +404,11 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
               }}
               className={errors.toLocation ? 'error' : ''}
             >
-              <option value="">よく使う場所を選択</option>
-              {commonLocations.map(location => (
+              <option value="">選択してください</option>
+              {locations.map(location => (
                 <option key={location} value={location}>{location}</option>
               ))}
-              <option value="custom">手入力で追加</option>
+              <option value="custom">その他（手入力）</option>
             </select>
             
             {isCustomToLocation && (
@@ -365,15 +421,16 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
                     setErrors({...errors, toLocation: ''});
                   }
                 }}
-                placeholder="場所名を入力"
-                className={`custom-input ${errors.toLocation ? 'error' : ''}`}
+                placeholder="移動先を入力"
+                className={errors.toLocation ? 'error' : ''}
+                style={{ marginTop: '5px' }}
               />
             )}
           </div>
           {errors.toLocation && <span className="error-message">{errors.toLocation}</span>}
         </div>
 
-        {/* 移動手段・消費カロリー */}
+        {/* 移動手段 */}
         <div className="form-group">
           <label>移動手段:</label>
           <select
@@ -386,6 +443,7 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
           </select>
         </div>
 
+        {/* 消費カロリー */}
         <div className="form-group">
           <label>消費カロリー:</label>
           <input
@@ -397,32 +455,29 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
                 setErrors({...errors, caloriesBurned: ''});
               }
             }}
-            placeholder="kcal (任意入力)"
-            min="0"
+            placeholder="kcal"
             className={errors.caloriesBurned ? 'error' : ''}
           />
           {errors.caloriesBurned && <span className="error-message">{errors.caloriesBurned}</span>}
         </div>
 
-        {/* 交通費支払情報 */}
+        {/* 交通費支払い */}
         <div className="form-group">
-          <div className="switch-group">
-            <label>交通費支払: 支払いあり</label>
-            <label className="switch">
-              <input
-                type="checkbox"
-                checked={hasPayment}
-                onChange={(e) => setHasPayment(e.target.checked)}
-              />
-              <span className="slider"></span>
-            </label>
+          <div className="checkbox-group">
+            <input
+              type="checkbox"
+              id="hasPayment"
+              checked={hasPayment}
+              onChange={(e) => setHasPayment(e.target.checked)}
+            />
+            <label htmlFor="hasPayment">交通費の支払いあり</label>
           </div>
 
           {hasPayment && (
             <div className="payment-info">
               <div className="form-group">
-                <label>支払先: <span className="required">*</span></label>
-                <div className="store-selection">
+                <label>支払先:</label>
+                <div className="location-selection">
                   <select
                     value={isCustomPaymentLocation ? 'custom' : paymentLocation}
                     onChange={(e) => {
@@ -439,11 +494,11 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
                     }}
                     className={errors.paymentLocation ? 'error' : ''}
                   >
-                    <option value="">交通事業者を選択</option>
-                    {transportCompanies.map(company => (
-                      <option key={company} value={company}>{company}</option>
+                    <option value="">選択してください</option>
+                    {paymentLocations.map(location => (
+                      <option key={location} value={location}>{location}</option>
                     ))}
-                    <option value="custom">手入力で追加</option>
+                    <option value="custom">その他（手入力）</option>
                   </select>
                   
                   {isCustomPaymentLocation && (
@@ -456,15 +511,16 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
                           setErrors({...errors, paymentLocation: ''});
                         }
                       }}
-                      placeholder="事業者名を入力"
-                      className={`custom-input ${errors.paymentLocation ? 'error' : ''}`}
+                      placeholder="支払先を入力"
+                      className={errors.paymentLocation ? 'error' : ''}
+                      style={{ marginTop: '5px' }}
                     />
                   )}
                 </div>
                 {errors.paymentLocation && <span className="error-message">{errors.paymentLocation}</span>}
               </div>
               <div className="form-group">
-                <label>金額: <span className="required">*</span></label>
+                <label>金額:</label>
                 <input
                   type="number"
                   value={amount}
@@ -475,7 +531,6 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
                     }
                   }}
                   placeholder="円"
-                  min="1"
                   className={errors.amount ? 'error' : ''}
                 />
                 {errors.amount && <span className="error-message">{errors.amount}</span>}
@@ -486,10 +541,9 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                 >
-                  <option value="交通系IC">交通系IC</option>
-                  <option value="現金">現金</option>
-                  <option value="クレジットカード">クレジットカード</option>
-                  <option value="その他">その他</option>
+                  {paymentMethods.map(method => (
+                    <option key={method} value={method}>{method}</option>
+                  ))}
                 </select>
               </div>
             </div>
