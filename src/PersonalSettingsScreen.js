@@ -1,4 +1,3 @@
-import { useAuth } from './contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { 
@@ -11,6 +10,7 @@ import {
   getDocs,
   writeBatch 
 } from 'firebase/firestore';
+import { useAuth } from './contexts/AuthContext';
 
 function PersonalSettingsScreen({ onBack }) {
   const { currentUser } = useAuth();
@@ -46,8 +46,7 @@ function PersonalSettingsScreen({ onBack }) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportStats, setExportStats] = useState(null);
 
-  // const personalSettingsDocId = 'user_personal_settings';
-  const personalSettingsDocId = 'user_personal_settings_${currentUser.uid}';
+  const personalSettingsDocId = `user_personal_settings_${currentUser?.uid || 'anonymous'}`;
 
   // 年齢計算
   const calculateAge = (birthdayString) => {
@@ -96,7 +95,7 @@ function PersonalSettingsScreen({ onBack }) {
 
   // エクスポート統計の取得
   const getExportStats = async (startDate, endDate) => {
-    if (!startDate || !endDate) return null;
+    if (!startDate || !endDate || !currentUser) return null;
 
     try {
       const start = new Date(startDate);
@@ -109,18 +108,22 @@ function PersonalSettingsScreen({ onBack }) {
       const startDateString = start.toDateString();
       const endDateString = end.toDateString();
       
-      // 期間内のレコードを検索
+      // シンプルなクエリに変更（複合インデックスの問題を回避）
       const q = query(
         collection(db, 'records'),
-        where('userId', '==', currentUser.uid),
-        where('date', '>=', startDateString),
-        where('date', '<=', endDateString)
+        where('userId', '==', currentUser.uid)
       );
       
       const querySnapshot = await getDocs(q);
-      const records = [];
+      const allRecords = [];
       querySnapshot.forEach((doc) => {
-        records.push({ id: doc.id, ...doc.data() });
+        allRecords.push({ id: doc.id, ...doc.data() });
+      });
+
+      // フロントエンドで日付フィルター
+      const records = allRecords.filter(record => {
+        const recordDate = record.date;
+        return recordDate >= startDateString && recordDate <= endDateString;
       });
 
       // カテゴリ別の統計を計算
@@ -175,14 +178,19 @@ function PersonalSettingsScreen({ onBack }) {
       // エクスポート対象のレコードを取得
       const q = query(
         collection(db, 'records'),
-        where('date', '>=', startDateString),
-        where('date', '<=', endDateString)
+        where('userId', '==', currentUser.uid)
       );
       
       const querySnapshot = await getDocs(q);
-      const records = [];
+      const allRecords = [];
       querySnapshot.forEach((doc) => {
-        records.push({ id: doc.id, ...doc.data() });
+        allRecords.push({ id: doc.id, ...doc.data() });
+      });
+
+      // フロントエンドで日付フィルター
+      const records = allRecords.filter(record => {
+        const recordDate = record.date;
+        return recordDate >= startDateString && recordDate <= endDateString;
       });
 
       if (records.length === 0) {
@@ -299,24 +307,31 @@ function PersonalSettingsScreen({ onBack }) {
       setIsExporting(false);
     }
   };
+
+  // データ削除統計の取得
   const getDeleteStats = async (toDate) => {
-    if (!toDate) return null;
+    if (!toDate || !currentUser) return null;
 
     try {
       const targetDate = new Date(toDate);
       const targetDateString = targetDate.toDateString();
       
-      // 指定日付以前のレコードを検索
+      // シンプルなクエリに変更
       const q = query(
         collection(db, 'records'),
-        where('userId', '==', currentUser.uid),
-        where('date', '<=', targetDateString)
+        where('userId', '==', currentUser.uid)
       );
       
       const querySnapshot = await getDocs(q);
-      const records = [];
+      const allRecords = [];
       querySnapshot.forEach((doc) => {
-        records.push({ id: doc.id, ...doc.data() });
+        allRecords.push({ id: doc.id, ...doc.data() });
+      });
+
+      // フロントエンドで日付フィルター
+      const records = allRecords.filter(record => {
+        const recordDate = record.date;
+        return recordDate <= targetDateString;
       });
 
       // カテゴリ別の統計を計算
@@ -339,24 +354,6 @@ function PersonalSettingsScreen({ onBack }) {
       return null;
     }
   };
-
-  // エクスポートプレビューの更新
-  useEffect(() => {
-    if (exportStartDate && exportEndDate) {
-      getExportStats(exportStartDate, exportEndDate).then(setExportStats);
-    } else {
-      setExportStats(null);
-    }
-  }, [exportStartDate, exportEndDate]);
-
-  // 削除プレビューの更新
-  useEffect(() => {
-    if (deleteDate) {
-      getDeleteStats(deleteDate).then(setDeleteStats);
-    } else {
-      setDeleteStats(null);
-    }
-  }, [deleteDate]);
 
   // 特定日付以前のデータ削除
   const handleDeleteDataToDate = async () => {
@@ -395,36 +392,38 @@ function PersonalSettingsScreen({ onBack }) {
       // 削除対象のレコードを取得
       const q = query(
         collection(db, 'records'),
-        where('date', '<=', targetDateString)
+        where('userId', '==', currentUser.uid)
       );
       
       const querySnapshot = await getDocs(q);
+      const docsToDelete = [];
       
-      if (querySnapshot.empty) {
+      querySnapshot.forEach((docSnapshot) => {
+        const data = docSnapshot.data();
+        if (data.date <= targetDateString) {
+          docsToDelete.push(docSnapshot.ref);
+        }
+      });
+      
+      if (docsToDelete.length === 0) {
         alert('削除対象のデータがありません');
         return;
       }
 
       // バッチ削除（Firestoreの制限により500件ずつ処理）
-      const batch = writeBatch(db);
-      let batchCount = 0;
+      const batchSize = 500;
       let totalDeleted = 0;
 
-      for (const docSnapshot of querySnapshot.docs) {
-        batch.delete(docSnapshot.ref);
-        batchCount++;
-        totalDeleted++;
-
-        // 500件に達したらバッチをコミット
-        if (batchCount >= 500) {
-          await batch.commit();
-          batchCount = 0;
-        }
-      }
-
-      // 残りのバッチをコミット
-      if (batchCount > 0) {
+      for (let i = 0; i < docsToDelete.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const batchDocs = docsToDelete.slice(i, i + batchSize);
+        
+        batchDocs.forEach((docRef) => {
+          batch.delete(docRef);
+        });
+        
         await batch.commit();
+        totalDeleted += batchDocs.length;
       }
 
       alert(`${totalDeleted}件のデータを削除しました`);
@@ -438,6 +437,24 @@ function PersonalSettingsScreen({ onBack }) {
       setIsDeleting(false);
     }
   };
+
+  // エクスポートプレビューの更新
+  useEffect(() => {
+    if (exportStartDate && exportEndDate) {
+      getExportStats(exportStartDate, exportEndDate).then(setExportStats);
+    } else {
+      setExportStats(null);
+    }
+  }, [exportStartDate, exportEndDate]);
+
+  // 削除プレビューの更新
+  useEffect(() => {
+    if (deleteDate) {
+      getDeleteStats(deleteDate).then(setDeleteStats);
+    } else {
+      setDeleteStats(null);
+    }
+  }, [deleteDate]);
 
   // データ読み込み
   useEffect(() => {
