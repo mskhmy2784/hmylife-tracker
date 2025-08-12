@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  getDoc 
+} from 'firebase/firestore';
 
 function MeasurementRecord({ onBack, onSave, editingRecord }) {
   const [recordTime, setRecordTime] = useState(() => {
@@ -16,43 +23,57 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
   const [bloodPressureLow, setBloodPressureLow] = useState('');
   const [waistSize, setWaistSize] = useState('');
   const [useLocationInfo, setUseLocationInfo] = useState(true);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [memo, setMemo] = useState('');
 
-  // ユーザー設定情報
-  const [userHeight, setUserHeight] = useState(170.0); // デフォルト値
-  const [userGender, setUserGender] = useState('male');
-  const [userAge, setUserAge] = useState(30);
+  // 設定から取得する身長
+  const [height, setHeight] = useState(170.0);
 
-  // ユーザー設定の読み込み
+  // 位置情報取得
   useEffect(() => {
-    const loadUserSettings = async () => {
+    if (useLocationInfo && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+        },
+        (error) => {
+          console.error('位置情報取得エラー:', error);
+          setCurrentLocation(null);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000
+        }
+      );
+    } else if (!useLocationInfo) {
+      setCurrentLocation(null);
+    }
+  }, [useLocationInfo]);
+
+  // 個人設定から身長を取得
+  useEffect(() => {
+    const fetchPersonalSettings = async () => {
       try {
-        const userDoc = await getDoc(doc(db, 'settings', 'userInfo'));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
+        const docRef = doc(db, 'personal_settings', 'user_personal_settings');
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          const data = docSnap.data();
           if (data.height) {
-            setUserHeight(data.height);
-          }
-          if (data.gender) {
-            setUserGender(data.gender);
-          }
-          if (data.birthDate) {
-            // 年齢計算
-            const today = new Date();
-            const birth = new Date(data.birthDate);
-            let age = today.getFullYear() - birth.getFullYear();
-            const monthDiff = today.getMonth() - birth.getMonth();
-            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-              age--;
-            }
-            setUserAge(age);
+            setHeight(data.height);
           }
         }
       } catch (error) {
-        console.error('ユーザー設定読み込みエラー:', error);
+        console.error('個人設定取得エラー:', error);
       }
     };
-    loadUserSettings();
+
+    fetchPersonalSettings();
   }, []);
 
   // 編集時のデータ初期化
@@ -66,14 +87,19 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
       setWaistSize(editingRecord.waistSize ? editingRecord.waistSize.toString() : '');
       setUseLocationInfo(editingRecord.useLocationInfo !== false);
       setMemo(editingRecord.memo || '');
+      
+      // 編集時は既存の位置情報があれば設定
+      if (editingRecord.location) {
+        setCurrentLocation(editingRecord.location);
+      }
     }
   }, [editingRecord]);
 
   // BMI計算
   const calculateBMI = () => {
-    if (!weight || weight <= 0 || userHeight <= 0) return null;
+    if (!weight || weight <= 0 || height <= 0) return null;
     const weightNum = parseFloat(weight);
-    const heightM = userHeight / 100; // cmをmに変換
+    const heightM = height / 100; // cmをmに変換
     const bmi = weightNum / (heightM * heightM);
     return Math.round(bmi * 10) / 10; // 小数点1桁
   };
@@ -89,45 +115,8 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
     return '肥満(2度以上)';
   };
 
-  // 基礎代謝計算（Harris-Benedict式）
-  const calculateBMR = () => {
-    if (!weight || !userHeight || !userAge) return null;
-    const weightNum = parseFloat(weight);
-    
-    if (userGender === 'male') {
-      // 男性: BMR = 88.362 + (13.397 × 体重kg) + (4.799 × 身長cm) - (5.677 × 年齢)
-      return Math.round(88.362 + (13.397 * weightNum) + (4.799 * userHeight) - (5.677 * userAge));
-    } else {
-      // 女性: BMR = 447.593 + (9.247 × 体重kg) + (3.098 × 身長cm) - (4.330 × 年齢)
-      return Math.round(447.593 + (9.247 * weightNum) + (3.098 * userHeight) - (4.330 * userAge));
-    }
-  };
-
-  const bmr = calculateBMR();
-
-  // 標準体重計算
-  const calculateStandardWeight = () => {
-    if (!userHeight) return null;
-    const heightM = userHeight / 100;
-    return Math.round(22 * heightM * heightM * 10) / 10; // BMI22での体重
-  };
-
-  const standardWeight = calculateStandardWeight();
-
   // 保存処理
   const handleSave = async () => {
-    // バリデーション
-    if (!weight && !bodyFatRate && !bloodPressureHigh && !bloodPressureLow && !waistSize) {
-      alert('測定時刻以外の項目を少なくとも一つは入力してください');
-      return;
-    }
-
-    // 血圧の入力チェック（片方だけの入力は無効）
-    if ((bloodPressureHigh && !bloodPressureLow) || (!bloodPressureHigh && bloodPressureLow)) {
-      alert('血圧は最高血圧と最低血圧の両方を入力してください');
-      return;
-    }
-
     try {
       const measurementData = {
         category: '計量',
@@ -139,23 +128,19 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
         waistSize: parseFloat(waistSize) || null,
         bmi: bmi,
         bmiCategory: getBMICategory(bmi),
-        bmr: bmr, // 基礎代謝を追加
-        standardWeight: standardWeight, // 標準体重を追加
-        height: userHeight, // 計算に使用した身長も保存
-        age: userAge, // 計算に使用した年齢も保存
-        gender: userGender, // 計算に使用した性別も保存
+        height: height, // 計算に使用した身長も保存
         useLocationInfo: useLocationInfo,
+        location: useLocationInfo && currentLocation ? currentLocation : null,
         memo: memo,
         createdAt: editingRecord ? editingRecord.createdAt : new Date(),
+        updatedAt: new Date(),
         date: new Date().toDateString()
       };
 
       if (editingRecord) {
         await updateDoc(doc(db, 'records', editingRecord.id), measurementData);
-        alert('計量記録を更新しました！');
       } else {
         await addDoc(collection(db, 'records'), measurementData);
-        alert('計量記録を保存しました！');
       }
       
       onSave();
@@ -167,25 +152,21 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
 
   // 削除処理
   const handleDelete = async () => {
-    if (!editingRecord) return;
-    
-    const confirmDelete = window.confirm('この記録を削除しますか？');
-    if (!confirmDelete) return;
-
-    try {
-      await deleteDoc(doc(db, 'records', editingRecord.id));
-      alert('計量記録を削除しました');
-      onSave();
-    } catch (error) {
-      console.error('削除エラー:', error);
-      alert('削除に失敗しました');
+    if (window.confirm('この記録を削除しますか？')) {
+      try {
+        await deleteDoc(doc(db, 'records', editingRecord.id));
+        onBack();
+      } catch (error) {
+        console.error('削除エラー:', error);
+        alert('削除に失敗しました');
+      }
     }
   };
 
   return (
-    <div className="measurement-record">
+    <div className="record-screen">
       <div className="record-header">
-        <button className="back-btn" onClick={onBack}>←</button>
+        <button className="back-btn" onClick={onBack}>← 戻る</button>
         <h2>{editingRecord ? '計量記録編集' : '計量記録'}</h2>
         <button className="save-btn" onClick={handleSave}>保存</button>
       </div>
@@ -211,11 +192,6 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
             onChange={(e) => setWeight(e.target.value)}
             placeholder="kg"
           />
-          {standardWeight && (
-            <div className="standard-weight-info">
-              標準体重: {standardWeight}kg (BMI22基準)
-            </div>
-          )}
         </div>
 
         {/* BMI表示 */}
@@ -226,20 +202,12 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
               <span className="bmi-value">{bmi}</span>
               <span className="bmi-category">({getBMICategory(bmi)})</span>
             </div>
-            <div className="bmi-note">身長: {userHeight}cm で計算</div>
-          </div>
-        )}
-
-        {/* 基礎代謝表示 */}
-        {bmr && (
-          <div className="form-group">
-            <label>基礎代謝:</label>
-            <div className="bmr-display">
-              <span className="bmr-value">{bmr} kcal/日</span>
-            </div>
-            <div className="bmr-note">
-              {userAge}歳 {userGender === 'male' ? '男性' : '女性'} {userHeight}cm {weight}kg で計算
-            </div>
+            <div className="bmi-note">身長: {height}cm で計算</div>
+            {height === 170.0 && (
+              <div className="settings-hint">
+                💡 個人設定で身長を設定すると、より正確なBMIが計算されます
+              </div>
+            )}
           </div>
         )}
 
@@ -288,18 +256,30 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
           />
         </div>
 
-        {/* 位置情報・メモ */}
+        {/* 位置情報 */}
         <div className="form-group">
-          <div className="checkbox-group">
-            <input
-              type="checkbox"
-              id="useLocationInfo"
-              checked={useLocationInfo}
-              onChange={(e) => setUseLocationInfo(e.target.checked)}
-            />
-            <label htmlFor="useLocationInfo">位置情報を記録</label>
-            <span className="location-status">📍現在地取得中...</span>
+          <div className="location-switch-row">
+            <label>位置情報を記録:</label>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={useLocationInfo}
+                onChange={(e) => setUseLocationInfo(e.target.checked)}
+              />
+              <span className="slider"></span>
+            </label>
+            <span className="location-status">
+              {!useLocationInfo ? '' :
+               currentLocation ? '✅ 位置情報取得完了' : '📍 位置情報取得中...'}
+            </span>
           </div>
+          {currentLocation && useLocationInfo && (
+            <div className="location-details">
+              緯度: {currentLocation.latitude.toFixed(6)}, 
+              経度: {currentLocation.longitude.toFixed(6)}
+              {currentLocation.accuracy && ` (精度: ${Math.round(currentLocation.accuracy)}m)`}
+            </div>
+          )}
         </div>
 
         <div className="form-group">
