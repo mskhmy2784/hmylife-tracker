@@ -1,3 +1,4 @@
+import { useAuth } from './contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { 
@@ -8,7 +9,8 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
-  orderBy 
+  orderBy,
+  where 
 } from 'firebase/firestore';
 import PersonalSettingsScreen from './PersonalSettingsScreen';
 
@@ -22,6 +24,7 @@ const masterDataTabs = [
 ];
 
 function SettingsScreen({ onBack }) {
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('personal');
   const [loading, setLoading] = useState(true);
   
@@ -54,6 +57,8 @@ function SettingsScreen({ onBack }) {
       return;
     }
     
+    if (!currentUser) return;
+
     // getCurrentCollection関数をuseEffect内に移動
     const getCollectionName = () => {
       const tab = masterDataTabs.find(tab => tab.id === activeTab);
@@ -65,6 +70,7 @@ function SettingsScreen({ onBack }) {
     
     const q = query(
       collection(db, collectionName),
+      where('userId', '==', currentUser.uid),
       orderBy('order', 'asc')
     );
 
@@ -95,7 +101,7 @@ function SettingsScreen({ onBack }) {
     );
 
     return () => unsubscribe();
-  }, [activeTab]); // activeTabのみに依存
+  }, [activeTab, currentUser]); // activeTabのみに依存
 
   // アイテム追加
   const handleAddItem = async () => {
@@ -115,6 +121,7 @@ function SettingsScreen({ onBack }) {
 
       await addDoc(collection(db, getCollectionName()), {
         name: newItemName.trim(),
+        userId: currentUser.uid,
         order: newOrder,
         createdAt: new Date(),
         updatedAt: new Date()

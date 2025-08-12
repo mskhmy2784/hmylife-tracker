@@ -1,3 +1,4 @@
+import { useAuth } from './contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { 
@@ -8,10 +9,12 @@ import {
   doc, 
   query, 
   orderBy, 
-  onSnapshot 
+  onSnapshot,
+  where
 } from 'firebase/firestore';
 
 function MoveRecord({ onBack, onSave, editingRecord }) {
+  const { currentUser } = useAuth(); 
   const [startTime, setStartTime] = useState(() => {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -138,6 +141,8 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
 
   // マスタデータ読み込み
   useEffect(() => {
+    if (!currentUser) return;
+
     let loadedCount = 0;
     const totalCollections = 3;
 
@@ -151,6 +156,7 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
     // 場所のマスタデータ
     const locationsQuery = query(
       collection(db, 'master_locations'),
+      where('userId', '==', currentUser.uid),
       orderBy('order', 'asc')
     );
 
@@ -172,6 +178,7 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
     // 交通手段のマスタデータ
     const transportQuery = query(
       collection(db, 'master_transport_methods'),
+      where('userId', '==', currentUser.uid),
       orderBy('order', 'asc')
     );
 
@@ -193,6 +200,7 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
     // 店舗のマスタデータ（支払先用）
     const storesQuery = query(
       collection(db, 'master_stores'),
+      where('userId', '==', currentUser.uid),
       orderBy('order', 'asc')
     );
 
@@ -216,7 +224,7 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
       unsubscribeTransport();
       unsubscribeStores();
     };
-  }, []);
+  }, [currentUser]);
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -278,6 +286,7 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
     try {
       const moveData = {
         category: '移動',
+        userId: currentUser.uid,
         startTime: startTime,
         endTime: endTime,
         fromLocation: isCustomFromLocation ? fromLocationInput : fromLocation,

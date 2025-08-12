@@ -1,8 +1,10 @@
+import { useAuth } from './contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
 function InfoRecord({ onBack, onSave, editingRecord }) {
+  const { currentUser } = useAuth();
   const [recordTime, setRecordTime] = useState(() => {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -108,6 +110,7 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
     try {
       const infoData = {
         category: '情報',
+        userId: currentUser.uid,
         recordTime: recordTime,
         infoType: infoType,
         priority: priority,

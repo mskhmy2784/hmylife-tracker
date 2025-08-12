@@ -162,7 +162,7 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
     try {
       const sleepData = {
         category: '睡眠',
-        userID: currentUser.uid,
+        userId: currentUser.uid,
         wakeTime: wakeTime,
         sleepTime: sleepTime,
         sleepHours: sleepDuration.hours,

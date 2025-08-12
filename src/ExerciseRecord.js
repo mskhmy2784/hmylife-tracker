@@ -1,3 +1,4 @@
+import { useAuth } from './contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { 
@@ -8,10 +9,12 @@ import {
   doc, 
   query, 
   orderBy, 
-  onSnapshot 
+  onSnapshot,
+  where 
 } from 'firebase/firestore';
 
 function ExerciseRecord({ onBack, onSave, editingRecord }) {
+  const {currentUser } = useAuth();
   const [recordTime, setRecordTime] = useState(() => {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -120,9 +123,12 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
 
   // マスタデータ読み込み
   useEffect(() => {
+    if (!currentUser) return;
+
     // 運動種類のマスタデータ
     const exerciseTypesQuery = query(
       collection(db, 'master_exercise_types'),
+      where('userId', '==', currentUser.uid),
       orderBy('order', 'asc')
     );
 
@@ -142,6 +148,7 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
     // 場所のマスタデータ
     const locationsQuery = query(
       collection(db, 'master_locations'),
+      where('userId', '==', currentUser.uid),
       orderBy('order', 'asc')
     );
 
@@ -164,7 +171,7 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
       unsubscribeExerciseTypes();
       unsubscribeLocations();
     };
-  }, []);
+  }, [currentUser]);
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -190,6 +197,7 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
     try {
       const exerciseData = {
         category: '運動',
+        userId: currentUser.uid,
         recordTime: recordTime,
         exerciseType: exerciseType,
         exerciseContent: exerciseContent,

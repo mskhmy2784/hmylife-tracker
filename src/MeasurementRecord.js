@@ -1,3 +1,4 @@
+import { useAuth } from './contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { 
@@ -10,6 +11,7 @@ import {
 } from 'firebase/firestore';
 
 function MeasurementRecord({ onBack, onSave, editingRecord }) {
+  const { currentUser } = useAuth();
   const [recordTime, setRecordTime] = useState(() => {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -153,6 +155,7 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
     try {
       const measurementData = {
         category: '計量',
+        userId: currentUser.uid,
         recordTime: recordTime,
         weight: parseFloat(weight) || null,
         bodyFatRate: parseFloat(bodyFatRate) || null,

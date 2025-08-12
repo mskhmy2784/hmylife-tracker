@@ -1,3 +1,4 @@
+import { useAuth } from './contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { 
@@ -12,6 +13,7 @@ import {
 } from 'firebase/firestore';
 
 function PersonalSettingsScreen({ onBack }) {
+  const { currentUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -44,7 +46,8 @@ function PersonalSettingsScreen({ onBack }) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportStats, setExportStats] = useState(null);
 
-  const personalSettingsDocId = 'user_personal_settings';
+  // const personalSettingsDocId = 'user_personal_settings';
+  const personalSettingsDocId = 'user_personal_settings_${currentUser.uid}';
 
   // 年齢計算
   const calculateAge = (birthdayString) => {
@@ -109,6 +112,7 @@ function PersonalSettingsScreen({ onBack }) {
       // 期間内のレコードを検索
       const q = query(
         collection(db, 'records'),
+        where('userId', '==', currentUser.uid),
         where('date', '>=', startDateString),
         where('date', '<=', endDateString)
       );
@@ -305,6 +309,7 @@ function PersonalSettingsScreen({ onBack }) {
       // 指定日付以前のレコードを検索
       const q = query(
         collection(db, 'records'),
+        where('userId', '==', currentUser.uid),
         where('date', '<=', targetDateString)
       );
       
@@ -436,6 +441,8 @@ function PersonalSettingsScreen({ onBack }) {
 
   // データ読み込み
   useEffect(() => {
+    if (!currentUser) return;
+
     const docRef = doc(db, 'personal_settings', personalSettingsDocId);
     
     const unsubscribe = onSnapshot(docRef, 
@@ -464,13 +471,14 @@ function PersonalSettingsScreen({ onBack }) {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [personalSettingsDocId, currentUser]);
 
   // 保存処理
   const handleSave = async () => {
     setSaving(true);
     try {
       const personalData = {
+        userId: currentUser.uid,
         height: parseFloat(height) || null,
         birthday: birthday || null,
         gender: gender || null,
