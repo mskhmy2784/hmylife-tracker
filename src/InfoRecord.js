@@ -184,7 +184,7 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
         <div className="form-group">
           <label>情報種別:</label>
           <div className="info-type-buttons">
-            {['メモ', 'TODO', 'アイデア', ' 目標', '日記', 'その他'].map(type => (
+            {['メモ', 'TODO'].map(type => (
               <button
                 key={type}
                 className={`type-btn ${infoType === type ? 'active' : ''}`}
