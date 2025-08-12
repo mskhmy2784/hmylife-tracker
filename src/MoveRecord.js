@@ -37,7 +37,6 @@ function MoveRecord({ onBack, onSave, editingRecord }) {
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [memo, setMemo] = useState('');
-  const [errors, setErrors] = useState({});
 
   // マスタデータ
   const [masterLocations, setMasterLocations] = useState([]);
