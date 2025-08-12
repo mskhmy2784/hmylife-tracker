@@ -12,8 +12,72 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
   
   const [sleepTime, setSleepTime] = useState('23:00');
   const [useLocationInfo, setUseLocationInfo] = useState(true);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [locationError, setLocationError] = useState(null);
   const [memo, setMemo] = useState('');
   const [errors, setErrors] = useState({});
+
+  // 位置情報取得（住所情報付き）
+  useEffect(() => {
+    if (useLocationInfo && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const locationData = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: new Date().toISOString()
+          };
+          
+          // 住所情報を取得
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${locationData.latitude}&lon=${locationData.longitude}&zoom=18&addressdetails=1&accept-language=ja`,
+              {
+                headers: {
+                  'User-Agent': 'LifeTracker/1.0'
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data && data.display_name) {
+                const addressInfo = {
+                  fullAddress: data.display_name,
+                  road: data.address?.road || '',
+                  city: data.address?.city || data.address?.town || data.address?.village || '',
+                  state: data.address?.state || '',
+                  country: data.address?.country || '',
+                  postcode: data.address?.postcode || ''
+                };
+                
+                locationData.address = addressInfo;
+              }
+            }
+          } catch (error) {
+            console.error('住所取得エラー:', error);
+          }
+          
+          setCurrentLocation(locationData);
+          setLocationError(null);
+        },
+        (error) => {
+          console.error('位置情報取得エラー:', error);
+          setLocationError(error.message);
+          setCurrentLocation(null);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5分間キャッシュ
+        }
+      );
+    } else if (!useLocationInfo) {
+      setCurrentLocation(null);
+      setLocationError(null);
+    }
+  }, [useLocationInfo]);
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -22,6 +86,11 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
       setSleepTime(editingRecord.sleepTime || '23:00');
       setUseLocationInfo(editingRecord.useLocationInfo !== false);
       setMemo(editingRecord.memo || '');
+      
+      // 編集時は既存の位置情報があれば設定
+      if (editingRecord.location) {
+        setCurrentLocation(editingRecord.location);
+      }
     }
   }, [editingRecord]);
 
@@ -97,19 +166,19 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
         sleepMinutes: sleepDuration.minutes,
         totalSleepMinutes: sleepDuration.totalMinutes,
         useLocationInfo: useLocationInfo,
+        location: useLocationInfo && currentLocation ? currentLocation : null,
         memo: memo,
         createdAt: editingRecord ? editingRecord.createdAt : new Date(),
+        updatedAt: new Date(),
         date: new Date().toDateString()
       };
 
       if (editingRecord) {
         await updateDoc(doc(db, 'records', editingRecord.id), sleepData);
-        alert('睡眠記録を更新しました！');
       } else {
         await addDoc(collection(db, 'records'), sleepData);
-        alert('睡眠記録を保存しました！');
       }
-      
+
       onSave();
     } catch (error) {
       console.error('保存エラー:', error);
@@ -119,25 +188,29 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
 
   // 削除処理
   const handleDelete = async () => {
-    if (!editingRecord) return;
-    
-    const confirmDelete = window.confirm('この記録を削除しますか？');
-    if (!confirmDelete) return;
-
-    try {
-      await deleteDoc(doc(db, 'records', editingRecord.id));
-      alert('睡眠記録を削除しました');
-      onSave();
-    } catch (error) {
-      console.error('削除エラー:', error);
-      alert('削除に失敗しました');
+    if (window.confirm('この記録を削除しますか？')) {
+      try {
+        await deleteDoc(doc(db, 'records', editingRecord.id));
+        onBack();
+      } catch (error) {
+        console.error('削除エラー:', error);
+        alert('削除に失敗しました');
+      }
     }
   };
 
+  // 位置情報ステータス表示
+  const getLocationStatus = () => {
+    if (!useLocationInfo) return '';
+    if (locationError) return '❌ 位置情報取得失敗';
+    if (currentLocation) return '✅ 位置情報取得完了';
+    return '📍 位置情報取得中...';
+  };
+
   return (
-    <div className="sleep-record">
+    <div className="record-screen">
       <div className="record-header">
-        <button className="back-btn" onClick={onBack}>←</button>
+        <button className="back-btn" onClick={onBack}>← 戻る</button>
         <h2>{editingRecord ? '睡眠記録編集' : '睡眠記録'}</h2>
         <button className="save-btn" onClick={handleSave}>保存</button>
       </div>
@@ -145,33 +218,24 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
       <div className="record-form">
         {/* 起床時刻 */}
         <div className="form-group">
-          <label>起床時刻: <span className="required">*</span></label>
+          <label>起床時刻:</label>
           <input
             type="time"
             value={wakeTime}
-            onChange={(e) => {
-              setWakeTime(e.target.value);
-              if (errors.wakeTime || errors.duration) {
-                setErrors({...errors, wakeTime: '', duration: ''});
-              }
-            }}
+            onChange={(e) => setWakeTime(e.target.value)}
             className={errors.wakeTime ? 'error' : ''}
           />
+          <div className="sleep-note">今朝の起床時刻</div>
           {errors.wakeTime && <span className="error-message">{errors.wakeTime}</span>}
         </div>
 
         {/* 就寝時刻 */}
         <div className="form-group">
-          <label>就寝時刻: <span className="required">*</span></label>
+          <label>就寝時刻:</label>
           <input
             type="time"
             value={sleepTime}
-            onChange={(e) => {
-              setSleepTime(e.target.value);
-              if (errors.sleepTime || errors.duration) {
-                setErrors({...errors, sleepTime: '', duration: ''});
-              }
-            }}
+            onChange={(e) => setSleepTime(e.target.value)}
             className={errors.sleepTime ? 'error' : ''}
           />
           <div className="sleep-note">前日の就寝時刻</div>
@@ -187,18 +251,54 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
           {errors.duration && <span className="error-message">{errors.duration}</span>}
         </div>
 
-        {/* 位置情報・メモ */}
+        {/* 位置情報 */}
         <div className="form-group">
-          <div className="checkbox-group">
-            <input
-              type="checkbox"
-              id="useLocationInfo"
-              checked={useLocationInfo}
-              onChange={(e) => setUseLocationInfo(e.target.checked)}
-            />
-            <label htmlFor="useLocationInfo">位置情報を記録</label>
-            <span className="location-status">📍現在地取得中...</span>
+          <div className="location-switch-row">
+            <label>位置情報を記録:</label>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={useLocationInfo}
+                onChange={(e) => setUseLocationInfo(e.target.checked)}
+              />
+              <span className="slider"></span>
+            </label>
+            <span className="location-status">{getLocationStatus()}</span>
           </div>
+          {currentLocation && useLocationInfo && (
+            <div className="location-info">
+              <div className="location-details">
+                <strong>📍 座標:</strong> {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+                {currentLocation.accuracy && ` (精度: ${Math.round(currentLocation.accuracy)}m)`}
+              </div>
+              {currentLocation.address && (
+                <div className="address-details">
+                  <div className="address-success">
+                    <strong>🏠 住所:</strong> {
+                      currentLocation.address.state && currentLocation.address.city && currentLocation.address.road
+                        ? `${currentLocation.address.state}${currentLocation.address.city}${currentLocation.address.road}`
+                        : currentLocation.address.fullAddress
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {locationError && useLocationInfo && (
+            <div className="location-error">
+              ❌ {locationError}
+              <button 
+                className="retry-btn"
+                onClick={() => {
+                  setLocationError(null);
+                  setUseLocationInfo(false);
+                  setTimeout(() => setUseLocationInfo(true), 100);
+                }}
+              >
+                再試行
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="form-group">
