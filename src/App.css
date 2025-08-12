@@ -1042,6 +1042,7 @@ input[type="file"] {
   padding: 12px 20px;
   border-bottom: 1px solid #eee;
   transition: background-color 0.2s;
+  cursor: move;
 }
 
 .master-item:hover {
@@ -1052,10 +1053,31 @@ input[type="file"] {
   border-bottom: none;
 }
 
+.master-item.draggable {
+  cursor: grab;
+}
+
+.master-item.draggable:active {
+  cursor: grabbing;
+}
+
+.drag-handle {
+  color: #999;
+  font-size: 16px;
+  margin-right: 10px;
+  cursor: grab;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
 .item-name {
   flex: 1;
   color: #333;
   font-size: 14px;
+  margin-left: 5px;
 }
 
 .delete-item-btn {
