@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import MealRecord from './MealRecord';
 import SleepRecord from './SleepRecord';
 import ExpenseRecord from './ExpenseRecord';
@@ -131,11 +131,18 @@ function App() {
   // 画面遷移ハンドラー
   const handleBack = () => {
     setCurrentScreen('dashboard');
+    setEditingRecord(null);
   };
 
   const handleSave = () => {
     setCurrentScreen('dashboard');
+    setEditingRecord(null);
     // データはリアルタイムで更新されるので、ここでは何もしない
+  };
+
+  // 設定画面への遷移
+  const handleSettings = () => {
+    setCurrentScreen('settings');
   };
 
   // 編集画面への遷移
@@ -176,8 +183,8 @@ function App() {
       case '食事':
         icon = '🍽️';
         const amountText = record.amount > 0 ? ` ¥${record.amount.toLocaleString()}` : '';
-        const photoText = record.photos && record.photos.length > 0 ? ` 📷${record.photos.length}枚` : '';
-        content = `${record.mealType}${amountText} ${record.calories}kcal ${record.mealContent}${photoText}`;
+        const mealContentText = record.mealContent ? ` ${record.mealContent}` : '';
+        content = `${record.mealType}${amountText} ${record.calories}kcal${mealContentText}`;
         break;
       case '睡眠':
         icon = '😴';
@@ -185,8 +192,7 @@ function App() {
         break;
       case '支出':
         icon = '💰';
-        const expensePhotoText = record.photos && record.photos.length > 0 ? ` 📷${record.photos.length}枚` : '';
-        content = `${record.paymentLocation} ¥${record.amount.toLocaleString()} ${record.expenseContent}${expensePhotoText}`;
+        content = `${record.paymentLocation} ¥${record.amount.toLocaleString()} ${record.expenseContent}`;
         break;
       case '計量':
         icon = '⚖️';
@@ -238,14 +244,13 @@ function App() {
         const typeText = record.infoType;
         const completionText = record.infoType === 'TODO' && record.isCompleted ? ' ✅' : '';
         const dueDateText = record.dueDate ? ` (${record.dueDate}期限)` : '';
-        const infoPhotoText = record.photos && record.photos.length > 0 ? ` 📷${record.photos.length}枚` : '';
         
         // 情報内容の最初の50文字のみ表示
         const shortContent = record.infoContent.length > 50 ? 
           record.infoContent.substring(0, 50) + '...' : 
           record.infoContent;
         
-        content = `${priorityIcon} [${typeText}] ${shortContent}${dueDateText}${completionText}${infoPhotoText}`;
+        content = `${priorityIcon} [${typeText}] ${shortContent}${dueDateText}${completionText}`;
         break;
       // 今後他のカテゴリも追加
       default:
@@ -257,6 +262,10 @@ function App() {
   };
 
   // 画面の条件分岐レンダリング
+  if (currentScreen === 'settings') {
+    return <SettingsScreen onBack={handleBack} />;
+  }
+
   if (currentScreen === 'meal-record') {
     return <MealRecord onBack={handleBack} onSave={handleSave} />;
   }
@@ -313,20 +322,12 @@ function App() {
     return <InfoRecord onBack={handleBack} onSave={handleSave} editingRecord={editingRecord} />;
   }
 
-  if (currentScreen === 'settings') {
-    return <SettingsScreen onBack={handleBack} />;
-  }
-
   return (
     <div className="App">
       {/* ヘッダー */}
       <header className="app-header">
         <h1>Life Tracker</h1>
-        <button 
-          className="settings-btn"
-          onClick={() => setCurrentScreen('settings')}
-          title="管理画面"
-        >
+        <button className="settings-btn" onClick={handleSettings}>
           ⚙️
         </button>
       </header>
@@ -390,16 +391,16 @@ function App() {
         ) : (
           <div className="timeline-list">
             {records.map((record) => {
-              const { time, content, icon } = formatRecord(record);
+              const formatted = formatRecord(record);
               return (
-                <div
-                  key={record.id}
-                  className="timeline-item clickable"
+                <div 
+                  key={record.id} 
+                  className="timeline-item clickable" 
                   onClick={() => handleEdit(record)}
                 >
-                  <div className="timeline-time">{time}</div>
-                  <div className="timeline-icon">{icon}</div>
-                  <div className="timeline-text">{content}</div>
+                  <span className="timeline-time">{formatted.time}</span>
+                  <span className="timeline-icon">{formatted.icon}</span>
+                  <span className="timeline-text">{formatted.content}</span>
                 </div>
               );
             })}
