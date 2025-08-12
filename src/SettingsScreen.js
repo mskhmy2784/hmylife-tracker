@@ -1,724 +1,307 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, doc, setDoc, getDoc, addDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs, writeBatch } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  orderBy 
+} from 'firebase/firestore';
 
 function SettingsScreen({ onBack }) {
-  // ユーザー基本情報
-  const [height, setHeight] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [gender, setGender] = useState('male');
-  const [userInfoSaving, setUserInfoSaving] = useState(false);
-
-  // デフォルトカロリー設定
-  const [defaultCalories, setDefaultCalories] = useState({
-    '朝食': 500,
-    '昼食': 700,
-    '夕食': 600,
-    '間食': 200
-  });
-  const [caloriesSaving, setCaloriesSaving] = useState(false);
-
-  // マスタデータ
-  const [paymentLocations, setPaymentLocations] = useState([]);
-  const [paymentMethods, setPaymentMethods] = useState([]);
-  const [locations, setLocations] = useState([]);
+  const [activeTab, setActiveTab] = useState('stores');
+  const [loading, setLoading] = useState(true);
   
-  // 新規追加用の入力値
-  const [newPaymentLocation, setNewPaymentLocation] = useState('');
-  const [newPaymentMethod, setNewPaymentMethod] = useState('');
-  const [newLocation, setNewLocation] = useState('');
+  // マスタデータ
+  const [stores, setStores] = useState([]);
+  const [exerciseTypes, setExerciseTypes] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [transportMethods, setTransportMethods] = useState([]);
+  
+  // 入力用state
+  const [newItemName, setNewItemName] = useState('');
+  const [editingItem, setEditingItem] = useState(null);
+  const [editingName, setEditingName] = useState('');
 
-  // 現在選択中のタブ
-  const [activeTab, setActiveTab] = useState('userInfo');
+  // マスタデータタブ設定
+  const masterDataTabs = [
+    { id: 'stores', name: '店舗', collection: 'master_stores' },
+    { id: 'exercise', name: '運動種類', collection: 'master_exercise_types' },
+    { id: 'locations', name: '場所', collection: 'master_locations' },
+    { id: 'transport', name: '交通手段', collection: 'master_transport_methods' }
+  ];
 
-  // データ削除関連の状態
-  const [deleteDate, setDeleteDate] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [recordCounts, setRecordCounts] = useState({
-    total: 0,
-    targetDate: 0
-  });
-
-  // ユーザー基本情報の読み込み
-  useEffect(() => {
-    const loadUserInfo = async () => {
-      try {
-        const userDoc = await getDoc(doc(db, 'settings', 'userInfo'));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setHeight(data.height || '');
-          setBirthDate(data.birthDate || '');
-          setGender(data.gender || 'male');
-        }
-
-        // デフォルトカロリー設定の読み込み
-        const caloriesDoc = await getDoc(doc(db, 'settings', 'defaultCalories'));
-        if (caloriesDoc.exists()) {
-          setDefaultCalories(caloriesDoc.data());
-        }
-      } catch (error) {
-        console.error('ユーザー情報読み込みエラー:', error);
-      }
-    };
-    loadUserInfo();
-  }, []);
-
-  // マスタデータの読み込み
-  useEffect(() => {
-    // 支払先の読み込み
-    const unsubscribePaymentLocations = onSnapshot(
-      query(collection(db, 'masterData', 'paymentLocations', 'items'), orderBy('order', 'asc')),
-      (snapshot) => {
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setPaymentLocations(items);
-      }
-    );
-
-    // 支払方法の読み込み
-    const unsubscribePaymentMethods = onSnapshot(
-      query(collection(db, 'masterData', 'paymentMethods', 'items'), orderBy('order', 'asc')),
-      (snapshot) => {
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setPaymentMethods(items);
-      }
-    );
-
-    // 場所の読み込み
-    const unsubscribeLocations = onSnapshot(
-      query(collection(db, 'masterData', 'locations', 'items'), orderBy('order', 'asc')),
-      (snapshot) => {
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setLocations(items);
-      }
-    );
-
-    return () => {
-      unsubscribePaymentLocations();
-      unsubscribePaymentMethods();
-      unsubscribeLocations();
-    };
-  }, []);
-
-  // 記録件数の取得
-  useEffect(() => {
-    const getRecordCounts = async () => {
-      try {
-        // 全記録数を取得
-        const allRecordsSnapshot = await getDocs(collection(db, 'records'));
-        const totalCount = allRecordsSnapshot.size;
-
-        let targetCount = 0;
-        if (deleteDate) {
-          // 指定日付以前の記録数を取得
-          const targetDateObj = new Date(deleteDate);
-          const targetDateString = targetDateObj.toDateString();
-          
-          // 指定日以前のデータを検索
-          const beforeDate = new Date(targetDateObj);
-          beforeDate.setDate(beforeDate.getDate() + 1); // 指定日の翌日
-          const beforeDateString = beforeDate.toDateString();
-          
-          const targetRecords = allRecordsSnapshot.docs.filter(doc => {
-            const recordDate = doc.data().date;
-            return recordDate < beforeDateString;
-          });
-          
-          targetCount = targetRecords.length;
-        }
-
-        setRecordCounts({
-          total: totalCount,
-          targetDate: targetCount
-        });
-      } catch (error) {
-        console.error('記録件数取得エラー:', error);
-      }
-    };
-
-    getRecordCounts();
-  }, [deleteDate]);
-
-  // 年齢計算
-  const calculateAge = () => {
-    if (!birthDate) return 0;
-    const today = new Date();
-    const birth = new Date(birthDate);
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
-    return age;
+  const getCurrentCollection = () => {
+    return masterDataTabs.find(tab => tab.id === activeTab)?.collection || 'master_stores';
   };
 
-  // 基礎代謝計算（Harris-Benedict式）
-  const calculateBMR = () => {
-    if (!height || !birthDate) return 0;
-    const age = calculateAge();
-    const heightNum = parseFloat(height);
+  const getCurrentData = () => {
+    switch (activeTab) {
+      case 'stores': return stores;
+      case 'exercise': return exerciseTypes;
+      case 'locations': return locations;
+      case 'transport': return transportMethods;
+      default: return stores;
+    }
+  };
+
+  const setCurrentData = (data) => {
+    switch (activeTab) {
+      case 'stores': setStores(data); break;
+      case 'exercise': setExerciseTypes(data); break;
+      case 'locations': setLocations(data); break;
+      case 'transport': setTransportMethods(data); break;
+    }
+  };
+
+  // データ読み込み
+  useEffect(() => {
+    const collectionName = getCurrentCollection();
+    console.log('データ読み込み開始:', collectionName);
     
-    if (gender === 'male') {
-      // 男性: BMR = 88.362 + (13.397 × 体重kg) + (4.799 × 身長cm) - (5.677 × 年齢)
-      // 体重は仮で65kgとして計算（実際の体重は計量記録から取得する想定）
-      return Math.round(88.362 + (13.397 * 65) + (4.799 * heightNum) - (5.677 * age));
-    } else {
-      // 女性: BMR = 447.593 + (9.247 × 体重kg) + (3.098 × 身長cm) - (4.330 × 年齢)
-      return Math.round(447.593 + (9.247 * 55) + (3.098 * heightNum) - (4.330 * age));
-    }
-  };
+    const q = query(
+      collection(db, collectionName),
+      orderBy('order', 'asc')
+    );
 
-  // ユーザー基本情報の保存
-  const handleSaveUserInfo = async () => {
-    setUserInfoSaving(true);
+    const unsubscribe = onSnapshot(q, 
+      (querySnapshot) => {
+        const data = [];
+        querySnapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() });
+        });
+        
+        setCurrentData(data);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Firestoreエラー:', error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [activeTab]);
+
+  // アイテム追加
+  const handleAddItem = async () => {
+    if (!newItemName.trim()) return;
+
     try {
-      await setDoc(doc(db, 'settings', 'userInfo'), {
-        height: parseFloat(height) || 0,
-        birthDate: birthDate,
-        gender: gender,
+      const currentData = getCurrentData();
+      const newOrder = currentData.length > 0 ? 
+        Math.max(...currentData.map(item => item.order || 0)) + 1 : 1;
+
+      await addDoc(collection(db, getCurrentCollection()), {
+        name: newItemName.trim(),
+        order: newOrder,
+        createdAt: new Date(),
         updatedAt: new Date()
       });
-      alert('ユーザー情報を保存しました！');
-    } catch (error) {
-      console.error('保存エラー:', error);
-      alert('保存に失敗しました');
-    } finally {
-      setUserInfoSaving(false);
-    }
-  };
 
-  // マスタデータの追加
-  const handleAddMasterData = async (type, value) => {
-    if (!value.trim()) return;
-    
-    try {
-      let collectionPath = '';
-      switch (type) {
-        case 'paymentLocation':
-          collectionPath = 'masterData/paymentLocations/items';
-          break;
-        case 'paymentMethod':
-          collectionPath = 'masterData/paymentMethods/items';
-          break;
-        case 'location':
-          collectionPath = 'masterData/locations/items';
-          break;
-        default:
-          return;
-      }
-
-      await addDoc(collection(db, collectionPath), {
-        name: value.trim(),
-        createdAt: new Date()
-      });
-
-      // 入力フィールドをクリア
-      switch (type) {
-        case 'paymentLocation':
-          setNewPaymentLocation('');
-          break;
-        case 'paymentMethod':
-          setNewPaymentMethod('');
-          break;
-        case 'location':
-          setNewLocation('');
-          break;
-        default:
-          // デフォルトケース - 何もしない
-          break;
-      }
-
-      alert('追加しました！');
+      setNewItemName('');
     } catch (error) {
       console.error('追加エラー:', error);
       alert('追加に失敗しました');
     }
   };
 
-  // マスタデータの削除
-  const handleDeleteMasterData = async (type, id, name) => {
-    const confirmDelete = window.confirm(`「${name}」を削除しますか？`);
-    if (!confirmDelete) return;
+  // アイテム更新
+  const handleUpdateItem = async (itemId) => {
+    if (!editingName.trim()) return;
 
     try {
-      let collectionPath = '';
-      switch (type) {
-        case 'paymentLocation':
-          collectionPath = 'masterData/paymentLocations/items';
-          break;
-        case 'paymentMethod':
-          collectionPath = 'masterData/paymentMethods/items';
-          break;
-        case 'location':
-          collectionPath = 'masterData/locations/items';
-          break;
-        default:
-          return;
-      }
+      await updateDoc(doc(db, getCurrentCollection(), itemId), {
+        name: editingName.trim(),
+        updatedAt: new Date()
+      });
 
-      await deleteDoc(doc(db, collectionPath, id));
-      alert('削除しました');
+      setEditingItem(null);
+      setEditingName('');
+    } catch (error) {
+      console.error('更新エラー:', error);
+      alert('更新に失敗しました');
+    }
+  };
+
+  // アイテム削除
+  const handleDeleteItem = async (itemId) => {
+    if (!window.confirm('このアイテムを削除しますか？')) return;
+
+    try {
+      await deleteDoc(doc(db, getCurrentCollection(), itemId));
     } catch (error) {
       console.error('削除エラー:', error);
       alert('削除に失敗しました');
     }
   };
 
-  // デフォルトカロリー設定の保存
-  const handleSaveDefaultCalories = async () => {
-    setCaloriesSaving(true);
-    try {
-      await setDoc(doc(db, 'settings', 'defaultCalories'), defaultCalories);
-      alert('デフォルトカロリー設定を保存しました！');
-    } catch (error) {
-      console.error('カロリー設定保存エラー:', error);
-      alert('保存に失敗しました');
-    } finally {
-      setCaloriesSaving(false);
-    }
-  };
-
-  // ドラッグ&ドロップ関連の処理
-  const handleDragStart = (e, index, type) => {
-    e.dataTransfer.setData('text/plain', JSON.stringify({ index, type }));
-    e.dataTransfer.effectAllowed = 'move';
+  // ドラッグ&ドロップでの順序変更
+  const handleDragStart = (e, index) => {
+    e.dataTransfer.setData('text/plain', index);
   };
 
   const handleDragOver = (e) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = async (e, dropIndex, type) => {
+  const handleDrop = async (e, dropIndex) => {
     e.preventDefault();
+    const dragIndex = parseInt(e.dataTransfer.getData('text/plain'));
     
+    if (dragIndex === dropIndex) return;
+
+    const currentData = getCurrentData();
+    const reorderedData = [...currentData];
+    const [draggedItem] = reorderedData.splice(dragIndex, 1);
+    reorderedData.splice(dropIndex, 0, draggedItem);
+
+    // 順序を更新
+    const updatePromises = reorderedData.map((item, index) =>
+      updateDoc(doc(db, getCurrentCollection(), item.id), {
+        order: index + 1,
+        updatedAt: new Date()
+      })
+    );
+
     try {
-      const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
-      const dragIndex = dragData.index;
-      
-      if (dragIndex === dropIndex || dragData.type !== type) return;
-
-      // 該当するデータ配列を取得
-      const items = type === 'paymentLocation' ? paymentLocations :
-                   type === 'paymentMethod' ? paymentMethods : locations;
-      
-      // 配列を並び替え
-      const newItems = [...items];
-      const draggedItem = newItems[dragIndex];
-      newItems.splice(dragIndex, 1);
-      newItems.splice(dropIndex, 0, draggedItem);
-
-      // order値を更新
-      const batch = writeBatch(db);
-      const collectionPath = type === 'paymentLocation' ? 'masterData/paymentLocations/items' :
-                            type === 'paymentMethod' ? 'masterData/paymentMethods/items' :
-                            'masterData/locations/items';
-
-      newItems.forEach((item, index) => {
-        const docRef = doc(db, collectionPath, item.id);
-        batch.update(docRef, { order: index });
-      });
-
-      await batch.commit();
+      await Promise.all(updatePromises);
     } catch (error) {
-      console.error('並び替えエラー:', error);
-      alert('並び替えに失敗しました');
+      console.error('順序更新エラー:', error);
+      alert('順序の更新に失敗しました');
     }
   };
 
-  // レコード削除処理
-  const handleDeleteRecords = async () => {
-    if (!deleteDate) {
-      alert('削除する日付を選択してください');
-      return;
-    }
+  // 編集開始
+  const startEdit = (item) => {
+    setEditingItem(item.id);
+    setEditingName(item.name);
+  };
 
-    if (recordCounts.targetDate === 0) {
-      alert('削除対象のレコードがありません');
-      return;
-    }
-
-    const confirmMessage = `${deleteDate}以前のレコード ${recordCounts.targetDate}件を削除しますか？\n\nこの操作は取り消すことができません。`;
-    const confirmed = window.confirm(confirmMessage);
-    
-    if (!confirmed) return;
-
-    setIsDeleting(true);
-    try {
-      // 指定日付以前の記録を取得
-      const targetDateObj = new Date(deleteDate);
-      const beforeDate = new Date(targetDateObj);
-      beforeDate.setDate(beforeDate.getDate() + 1); // 指定日の翌日
-      const beforeDateString = beforeDate.toDateString();
-
-      const allRecordsSnapshot = await getDocs(collection(db, 'records'));
-      const recordsToDelete = allRecordsSnapshot.docs.filter(doc => {
-        const recordDate = doc.data().date;
-        return recordDate < beforeDateString;
-      });
-
-      // バッチ処理で削除（Firestoreの制限で500件ずつ処理）
-      const batchSize = 500;
-      const batches = [];
-      
-      for (let i = 0; i < recordsToDelete.length; i += batchSize) {
-        const batch = writeBatch(db);
-        const batchRecords = recordsToDelete.slice(i, i + batchSize);
-        
-        batchRecords.forEach(record => {
-          batch.delete(record.ref);
-        });
-        
-        batches.push(batch);
-      }
-
-      // すべてのバッチを実行
-      await Promise.all(batches.map(batch => batch.commit()));
-
-      alert(`${recordCounts.targetDate}件のレコードを削除しました`);
-      setDeleteDate('');
-      
-    } catch (error) {
-      console.error('レコード削除エラー:', error);
-      alert('レコードの削除に失敗しました');
-    } finally {
-      setIsDeleting(false);
-    }
+  // 編集キャンセル
+  const cancelEdit = () => {
+    setEditingItem(null);
+    setEditingName('');
   };
 
   return (
     <div className="settings-screen">
-      <div className="record-header">
-        <button className="back-btn" onClick={onBack}>←</button>
-        <h2>管理画面</h2>
-        <div></div>
+      <div className="settings-header">
+        <button className="back-btn" onClick={onBack}>← 戻る</button>
+        <h2>設定・マスタデータ管理</h2>
       </div>
 
-      {/* タブメニュー */}
-      <div className="tab-menu">
-        <button 
-          className={`tab-btn ${activeTab === 'userInfo' ? 'active' : ''}`}
-          onClick={() => setActiveTab('userInfo')}
-        >
-          基本情報
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'masterData' ? 'active' : ''}`}
-          onClick={() => setActiveTab('masterData')}
-        >
-          マスタデータ
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'dataManagement' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dataManagement')}
-        >
-          データ管理
-        </button>
+      {/* タブ */}
+      <div className="settings-tabs">
+        {masterDataTabs.map(tab => (
+          <button
+            key={tab.id}
+            className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.name}
+          </button>
+        ))}
       </div>
 
       <div className="settings-content">
-        {/* ユーザー基本情報タブ */}
-        {activeTab === 'userInfo' && (
-          <div className="user-info-section">
-            <div className="form-group">
-              <label>身長 (cm):</label>
-              <input
-                type="number"
-                step="0.1"
-                value={height}
-                onChange={(e) => setHeight(e.target.value)}
-                placeholder="例: 170.5"
-              />
-            </div>
+        {/* 新規追加 */}
+        <div className="add-item-section">
+          <h3>新しい{masterDataTabs.find(t => t.id === activeTab)?.name}を追加</h3>
+          <div className="add-item-form">
+            <input
+              type="text"
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              placeholder={`${masterDataTabs.find(t => t.id === activeTab)?.name}名を入力`}
+              onKeyPress={(e) => e.key === 'Enter' && handleAddItem()}
+            />
+            <button className="add-btn" onClick={handleAddItem}>
+              追加
+            </button>
+          </div>
+        </div>
 
-            <div className="form-group">
-              <label>生年月日:</label>
-              <input
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-              />
-              {birthDate && (
-                <div className="info-display">
-                  現在の年齢: {calculateAge()}歳
+        {/* アイテム一覧 */}
+        <div className="items-list-section">
+          <h3>
+            {masterDataTabs.find(t => t.id === activeTab)?.name}一覧
+            <span className="drag-hint">（ドラッグで順序変更）</span>
+          </h3>
+          
+          {loading ? (
+            <div className="loading">読み込み中...</div>
+          ) : (
+            <div className="items-list">
+              {getCurrentData().map((item, index) => (
+                <div
+                  key={item.id}
+                  className="item-row"
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, index)}
+                >
+                  <div className="drag-handle">⋮⋮</div>
+                  
+                  {editingItem === item.id ? (
+                    <div className="edit-form">
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') handleUpdateItem(item.id);
+                          if (e.key === 'Escape') cancelEdit();
+                        }}
+                        autoFocus
+                      />
+                      <button 
+                        className="save-btn"
+                        onClick={() => handleUpdateItem(item.id)}
+                      >
+                        保存
+                      </button>
+                      <button 
+                        className="cancel-btn"
+                        onClick={cancelEdit}
+                      >
+                        キャンセル
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="item-display">
+                      <span className="item-name">{item.name}</span>
+                      <div className="item-actions">
+                        <button 
+                          className="edit-btn"
+                          onClick={() => startEdit(item)}
+                        >
+                          編集
+                        </button>
+                        <button 
+                          className="delete-btn"
+                          onClick={() => handleDeleteItem(item.id)}
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {getCurrentData().length === 0 && (
+                <div className="empty-state">
+                  まだアイテムがありません
                 </div>
               )}
             </div>
-
-            <div className="form-group">
-              <label>性別:</label>
-              <div className="gender-buttons">
-                <button
-                  className={`gender-btn ${gender === 'male' ? 'active' : ''}`}
-                  onClick={() => setGender('male')}
-                >
-                  男性
-                </button>
-                <button
-                  className={`gender-btn ${gender === 'female' ? 'active' : ''}`}
-                  onClick={() => setGender('female')}
-                >
-                  女性
-                </button>
-              </div>
-            </div>
-
-            {/* 計算結果表示 */}
-            {height && birthDate && (
-              <div className="calculation-results">
-                <h3>計算結果</h3>
-                <div className="result-item">
-                  <span className="result-label">基礎代謝:</span>
-                  <span className="result-value">{calculateBMR()} kcal/日</span>
-                </div>
-                <div className="result-note">
-                  ※基礎代謝は標準体重での概算値です。正確な値は体重測定後に再計算されます。
-                </div>
-              </div>
-            )}
-
-            <div className="save-section">
-              <button 
-                className="save-btn-large"
-                onClick={handleSaveUserInfo}
-                disabled={userInfoSaving}
-              >
-                {userInfoSaving ? '保存中...' : '基本情報を保存'}
-              </button>
-            </div>
-
-            {/* デフォルトカロリー設定 */}
-            <div className="calories-settings">
-              <h3>デフォルトカロリー設定</h3>
-              <div className="calories-grid">
-                {Object.entries(defaultCalories).map(([mealType, calories]) => (
-                  <div key={mealType} className="calorie-item">
-                    <label>{mealType}:</label>
-                    <div className="calorie-input">
-                      <input
-                        type="number"
-                        value={calories}
-                        onChange={(e) => setDefaultCalories(prev => ({
-                          ...prev,
-                          [mealType]: parseInt(e.target.value) || 0
-                        }))}
-                        min="0"
-                        max="2000"
-                      />
-                      <span>kcal</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="save-section">
-                <button 
-                  className="save-btn-large"
-                  onClick={handleSaveDefaultCalories}
-                  disabled={caloriesSaving}
-                >
-                  {caloriesSaving ? '保存中...' : 'カロリー設定を保存'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* マスタデータタブ */}
-        {activeTab === 'masterData' && (
-          <div className="master-data-section">
-            {/* 支払先管理 */}
-            <div className="master-category">
-              <h3>支払先・店舗</h3>
-              <div className="add-item-form">
-                <input
-                  type="text"
-                  value={newPaymentLocation}
-                  onChange={(e) => setNewPaymentLocation(e.target.value)}
-                  placeholder="新しい支払先を入力"
-                />
-                <button 
-                  className="add-btn"
-                  onClick={() => handleAddMasterData('paymentLocation', newPaymentLocation)}
-                >
-                  追加
-                </button>
-              </div>
-              <div className="master-list">
-                {paymentLocations.map((item, index) => (
-                  <div 
-                    key={item.id} 
-                    className="master-item draggable"
-                    draggable="true"
-                    onDragStart={(e) => handleDragStart(e, index, 'paymentLocation')}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, index, 'paymentLocation')}
-                  >
-                    <span className="drag-handle">⋮⋮</span>
-                    <span className="item-name">{item.name}</span>
-                    <button 
-                      className="delete-item-btn"
-                      onClick={() => handleDeleteMasterData('paymentLocation', item.id, item.name)}
-                    >
-                      削除
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 支払方法管理 */}
-            <div className="master-category">
-              <h3>支払方法</h3>
-              <div className="add-item-form">
-                <input
-                  type="text"
-                  value={newPaymentMethod}
-                  onChange={(e) => setNewPaymentMethod(e.target.value)}
-                  placeholder="新しい支払方法を入力"
-                />
-                <button 
-                  className="add-btn"
-                  onClick={() => handleAddMasterData('paymentMethod', newPaymentMethod)}
-                >
-                  追加
-                </button>
-              </div>
-              <div className="master-list">
-                {paymentMethods.map((item, index) => (
-                  <div 
-                    key={item.id} 
-                    className="master-item draggable"
-                    draggable="true"
-                    onDragStart={(e) => handleDragStart(e, index, 'paymentMethod')}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, index, 'paymentMethod')}
-                  >
-                    <span className="drag-handle">⋮⋮</span>
-                    <span className="item-name">{item.name}</span>
-                    <button 
-                      className="delete-item-btn"
-                      onClick={() => handleDeleteMasterData('paymentMethod', item.id, item.name)}
-                    >
-                      削除
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 場所管理 */}
-            <div className="master-category">
-              <h3>場所（移動先・移動元など）</h3>
-              <div className="add-item-form">
-                <input
-                  type="text"
-                  value={newLocation}
-                  onChange={(e) => setNewLocation(e.target.value)}
-                  placeholder="新しい場所を入力"
-                />
-                <button 
-                  className="add-btn"
-                  onClick={() => handleAddMasterData('location', newLocation)}
-                >
-                  追加
-                </button>
-              </div>
-              <div className="master-list">
-                {locations.map((item, index) => (
-                  <div 
-                    key={item.id} 
-                    className="master-item draggable"
-                    draggable="true"
-                    onDragStart={(e) => handleDragStart(e, index, 'location')}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, index, 'location')}
-                  >
-                    <span className="drag-handle">⋮⋮</span>
-                    <span className="item-name">{item.name}</span>
-                    <button 
-                      className="delete-item-btn"
-                      onClick={() => handleDeleteMasterData('location', item.id, item.name)}
-                    >
-                      削除
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* データ管理タブ */}
-        {activeTab === 'dataManagement' && (
-          <div className="data-management-section">
-            {/* 記録統計 */}
-            <div className="data-stats">
-              <h3>📊 記録統計</h3>
-              <div className="stats-info">
-                <div className="stat-item">
-                  <span className="stat-label">総記録数:</span>
-                  <span className="stat-value">{recordCounts.total}件</span>
-                </div>
-              </div>
-            </div>
-
-            {/* レコード削除機能 */}
-            <div className="data-delete-section">
-              <h3>🗑️ レコード削除</h3>
-              <div className="delete-warning">
-                ⚠️ 指定した日付以前のすべてのレコードが削除されます。この操作は取り消すことができません。
-              </div>
-              
-              <div className="delete-form">
-                <div className="form-group">
-                  <label>削除する日付を選択:</label>
-                  <input
-                    type="date"
-                    value={deleteDate}
-                    onChange={(e) => setDeleteDate(e.target.value)}
-                    max={new Date().toISOString().split('T')[0]} // 今日まで
-                  />
-                  <div className="delete-help">
-                    選択した日付以前のレコードがすべて削除されます
-                  </div>
-                </div>
-
-                {deleteDate && (
-                  <div className="delete-preview">
-                    <div className="preview-info">
-                      <strong>{deleteDate}以前のレコード: {recordCounts.targetDate}件</strong>が削除されます
-                    </div>
-                    {recordCounts.targetDate > 0 && (
-                      <div className="delete-details">
-                        • 削除後の残りレコード数: {recordCounts.total - recordCounts.targetDate}件
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="delete-action">
-                  <button
-                    className="delete-records-btn"
-                    onClick={handleDeleteRecords}
-                    disabled={!deleteDate || recordCounts.targetDate === 0 || isDeleting}
-                  >
-                    {isDeleting ? '削除中...' : `${recordCounts.targetDate}件のレコードを削除`}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* 注意事項 */}
-            <div className="data-notes">
-              <h4>注意事項</h4>
-              <ul>
-                <li>削除されたレコードは復元できません</li>
-                <li>写真ファイルも同時に削除されます</li>
-                <li>削除処理には時間がかかる場合があります</li>
-                <li>削除前に必要なデータはバックアップしてください</li>
-              </ul>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
