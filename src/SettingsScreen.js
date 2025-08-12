@@ -12,6 +12,15 @@ import {
 } from 'firebase/firestore';
 import PersonalSettingsScreen from './PersonalSettingsScreen';
 
+// マスタデータタブ設定をコンポーネント外に移動
+const masterDataTabs = [
+  { id: 'personal', name: '個人設定', collection: null },
+  { id: 'stores', name: '店舗', collection: 'master_stores' },
+  { id: 'exercise', name: '運動種類', collection: 'master_exercise_types' },
+  { id: 'locations', name: '場所', collection: 'master_locations' },
+  { id: 'transport', name: '交通手段', collection: 'master_transport_methods' }
+];
+
 function SettingsScreen({ onBack }) {
   const [activeTab, setActiveTab] = useState('personal');
   const [loading, setLoading] = useState(true);
@@ -26,20 +35,6 @@ function SettingsScreen({ onBack }) {
   const [newItemName, setNewItemName] = useState('');
   const [editingItem, setEditingItem] = useState(null);
   const [editingName, setEditingName] = useState('');
-
-  // マスタデータタブ設定
-  const masterDataTabs = [
-    { id: 'personal', name: '個人設定', collection: null },
-    { id: 'stores', name: '店舗', collection: 'master_stores' },
-    { id: 'exercise', name: '運動種類', collection: 'master_exercise_types' },
-    { id: 'locations', name: '場所', collection: 'master_locations' },
-    { id: 'transport', name: '交通手段', collection: 'master_transport_methods' }
-  ];
-
-  const getCurrentCollection = () => {
-    const tab = masterDataTabs.find(tab => tab.id === activeTab);
-    return tab?.collection || 'master_stores';
-  };
 
   const getCurrentData = () => {
     if (activeTab === 'personal') return [];
