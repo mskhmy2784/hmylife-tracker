@@ -30,6 +30,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('現金');
   const [useLocationInfo, setUseLocationInfo] = useState(true);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [memo, setMemo] = useState('');
 
   // マスタデータ
@@ -61,6 +62,32 @@ function MealRecord({ onBack, onSave, editingRecord }) {
       return '間食';
     }
   };
+
+  // 位置情報取得
+  useEffect(() => {
+    if (useLocationInfo && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+        },
+        (error) => {
+          console.error('位置情報取得エラー:', error);
+          setCurrentLocation(null);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000
+        }
+      );
+    } else if (!useLocationInfo) {
+      setCurrentLocation(null);
+    }
+  }, [useLocationInfo]);
 
   // マスタデータ読み込み
   useEffect(() => {
@@ -147,6 +174,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
         amount: isExternalMeal ? parseInt(amount) || 0 : 0,
         paymentMethod: isExternalMeal ? paymentMethod : '',
         useLocationInfo: useLocationInfo,
+        location: useLocationInfo && currentLocation ? currentLocation : null,
         memo: memo,
         createdAt: editingRecord ? editingRecord.createdAt : new Date(),
         updatedAt: new Date(),
@@ -345,16 +373,28 @@ function MealRecord({ onBack, onSave, editingRecord }) {
 
         {/* 位置情報・メモ */}
         <div className="form-group">
-          <div className="checkbox-group">
-            <input
-              type="checkbox"
-              id="useLocationInfo"
-              checked={useLocationInfo}
-              onChange={(e) => setUseLocationInfo(e.target.checked)}
-            />
-            <label htmlFor="useLocationInfo">位置情報を記録</label>
-            <span className="location-status">📍現在地取得中...</span>
+          <div className="location-switch-row">
+            <label>位置情報を記録:</label>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={useLocationInfo}
+                onChange={(e) => setUseLocationInfo(e.target.checked)}
+              />
+              <span className="slider"></span>
+            </label>
+            <span className="location-status">
+              {!useLocationInfo ? '' :
+               currentLocation ? '✅ 位置情報取得完了' : '📍 位置情報取得中...'}
+            </span>
           </div>
+          {currentLocation && useLocationInfo && (
+            <div className="location-details">
+              緯度: {currentLocation.latitude.toFixed(6)}, 
+              経度: {currentLocation.longitude.toFixed(6)}
+              {currentLocation.accuracy && ` (精度: ${Math.round(currentLocation.accuracy)}m)`}
+            </div>
+          )}
         </div>
 
         <div className="form-group">
