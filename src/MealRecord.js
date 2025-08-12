@@ -1,4 +1,5 @@
-import { useAuth } from './contexts/AuthContext';
+// MealRecord.js を以下の内容に置き換えてください
+
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { 
@@ -9,11 +10,14 @@ import {
   doc, 
   query, 
   orderBy, 
-  onSnapshot 
+  onSnapshot,
+  where
 } from 'firebase/firestore';
+import { useAuth } from './contexts/AuthContext'; // 認証情報を取得
 
 function MealRecord({ onBack, onSave, editingRecord }) {
-  const { currentUser } = useAuth();
+  const { currentUser } = useAuth(); // 現在ログインしているユーザー情報を取得
+
   const [recordTime, setRecordTime] = useState(() => {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -124,10 +128,13 @@ function MealRecord({ onBack, onSave, editingRecord }) {
     }
   }, [useLocationInfo]);
 
-  // マスタデータ読み込み
+  // マスタデータ読み込み（ユーザー固有のデータのみ）
   useEffect(() => {
+    if (!currentUser) return;
+
     const q = query(
       collection(db, 'master_stores'),
+      where('userId', '==', currentUser.uid), // ユーザー固有のデータのみ
       orderBy('order', 'asc')
     );
 
@@ -147,7 +154,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]);
 
   // 初期表示時の食事種別設定
   useEffect(() => {
@@ -200,7 +207,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
       
       const mealData = {
         category: '食事',
-        userId: currentUser.uid, // ← この行を追加
+        userId: currentUser.uid, // ユーザーIDを追加
         recordTime: recordTime,
         mealType: mealType,
         calories: finalCalories,
@@ -362,7 +369,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
                       }}
                     >
                       <option value="">
-                        {masterStores.length > 0 ? '登録された店舗を選択' : 'よく使う店舗を選択'}
+                        {masterStores.length > 0 ? '登録された店舗を選択' : 'よく行く店舗を選択'}
                       </option>
                       {storeOptions.map(store => (
                         <option key={store} value={store}>{store}</option>
@@ -381,9 +388,15 @@ function MealRecord({ onBack, onSave, editingRecord }) {
                     )}
                   </div>
                 )}
+                {masterStores.length === 0 && !loadingMasterData && (
+                  <div className="master-data-hint">
+                    💡 設定画面で店舗を追加できます
+                  </div>
+                )}
               </div>
+
               <div className="form-group">
-                <label>金額:</label>
+                <label>支払金額:</label>
                 <input
                   type="number"
                   value={amount}
@@ -391,6 +404,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
                   placeholder="円"
                 />
               </div>
+
               <div className="form-group">
                 <label>支払方法:</label>
                 <select
@@ -399,15 +413,17 @@ function MealRecord({ onBack, onSave, editingRecord }) {
                 >
                   <option value="現金">現金</option>
                   <option value="クレジットカード">クレジットカード</option>
+                  <option value="デビットカード">デビットカード</option>
                   <option value="電子マネー">電子マネー</option>
-                  <option value="交通系IC">交通系IC</option>
+                  <option value="QRコード決済">QRコード決済</option>
+                  <option value="その他">その他</option>
                 </select>
               </div>
             </div>
           )}
         </div>
 
-        {/* 位置情報・メモ */}
+        {/* 位置情報 */}
         <div className="form-group">
           <div className="location-switch-row">
             <label>位置情報を記録:</label>
