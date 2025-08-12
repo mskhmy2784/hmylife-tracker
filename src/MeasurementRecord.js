@@ -116,6 +116,18 @@ function MeasurementRecord({ onBack, onSave, editingRecord }) {
 
   // 保存処理
   const handleSave = async () => {
+    // バリデーション
+    if (!weight && !bodyFatRate && !bloodPressureHigh && !bloodPressureLow && !waistSize) {
+      alert('測定時刻以外の項目を少なくとも一つは入力してください');
+      return;
+    }
+
+    // 血圧の入力チェック（片方だけの入力は無効）
+    if ((bloodPressureHigh && !bloodPressureLow) || (!bloodPressureHigh && bloodPressureLow)) {
+      alert('血圧は最高血圧と最低血圧の両方を入力してください');
+      return;
+    }
+
     try {
       const measurementData = {
         category: '計量',
