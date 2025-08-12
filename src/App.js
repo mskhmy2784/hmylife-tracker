@@ -8,6 +8,7 @@ import MeasurementRecord from './MeasurementRecord';
 import ExerciseRecord from './ExerciseRecord';
 import MoveRecord from './MoveRecord';
 import InfoRecord from './InfoRecord';
+import SettingsScreen from './SettingsScreen';
 import './App.css';
 
 function App() {
@@ -312,11 +313,22 @@ function App() {
     return <InfoRecord onBack={handleBack} onSave={handleSave} editingRecord={editingRecord} />;
   }
 
+  if (currentScreen === 'settings') {
+    return <SettingsScreen onBack={handleBack} />;
+  }
+
   return (
     <div className="App">
       {/* ヘッダー */}
       <header className="app-header">
         <h1>Life Tracker</h1>
+        <button 
+          className="settings-btn"
+          onClick={() => setCurrentScreen('settings')}
+          title="管理画面"
+        >
+          ⚙️
+        </button>
       </header>
 
       {/* 記録ボタン */}
