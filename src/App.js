@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import MealRecord from './MealRecord';
 import SleepRecord from './SleepRecord';
 import ExpenseRecord from './ExpenseRecord';
