@@ -225,101 +225,102 @@ function SettingsScreen({ onBack }) {
       {/* マスタデータ管理画面 */}
       {activeTab !== 'personal' && (
         <div className="settings-content">
-        {/* 新規追加 */}
-        <div className="add-item-section">
-          <h3>新しい{masterDataTabs.find(t => t.id === activeTab)?.name}を追加</h3>
-          <div className="add-item-form">
-            <input
-              type="text"
-              value={newItemName}
-              onChange={(e) => setNewItemName(e.target.value)}
-              placeholder={`${masterDataTabs.find(t => t.id === activeTab)?.name}名を入力`}
-              onKeyPress={(e) => e.key === 'Enter' && handleAddItem()}
-            />
-            <button className="add-btn" onClick={handleAddItem}>
-              追加
-            </button>
+          {/* 新規追加 */}
+          <div className="add-item-section">
+            <h3>新しい{masterDataTabs.find(t => t.id === activeTab)?.name}を追加</h3>
+            <div className="add-item-form">
+              <input
+                type="text"
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                placeholder={`${masterDataTabs.find(t => t.id === activeTab)?.name}名を入力`}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddItem()}
+              />
+              <button className="add-btn" onClick={handleAddItem}>
+                追加
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* アイテム一覧 */}
-        <div className="items-list-section">
-          <h3>
-            {masterDataTabs.find(t => t.id === activeTab)?.name}一覧
-            <span className="drag-hint">（ドラッグで順序変更）</span>
-          </h3>
-          
-          {loading ? (
-            <div className="loading">読み込み中...</div>
-          ) : (
-            <div className="items-list">
-              {getCurrentData().map((item, index) => (
-                <div
-                  key={item.id}
-                  className="item-row"
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, index)}
-                >
-                  <div className="drag-handle">⋮⋮</div>
-                  
-                  {editingItem === item.id ? (
-                    <div className="edit-form">
-                      <input
-                        type="text"
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') handleUpdateItem(item.id);
-                          if (e.key === 'Escape') cancelEdit();
-                        }}
-                        autoFocus
-                      />
-                      <button 
-                        className="save-btn"
-                        onClick={() => handleUpdateItem(item.id)}
-                      >
-                        保存
-                      </button>
-                      <button 
-                        className="cancel-btn"
-                        onClick={cancelEdit}
-                      >
-                        キャンセル
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="item-display">
-                      <span className="item-name">{item.name}</span>
-                      <div className="item-actions">
+          {/* アイテム一覧 */}
+          <div className="items-list-section">
+            <h3>
+              {masterDataTabs.find(t => t.id === activeTab)?.name}一覧
+              <span className="drag-hint">（ドラッグで順序変更）</span>
+            </h3>
+            
+            {loading ? (
+              <div className="loading">読み込み中...</div>
+            ) : (
+              <div className="items-list">
+                {getCurrentData().map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="item-row"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, index)}
+                  >
+                    <div className="drag-handle">⋮⋮</div>
+                    
+                    {editingItem === item.id ? (
+                      <div className="edit-form">
+                        <input
+                          type="text"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') handleUpdateItem(item.id);
+                            if (e.key === 'Escape') cancelEdit();
+                          }}
+                          autoFocus
+                        />
                         <button 
-                          className="edit-btn"
-                          onClick={() => startEdit(item)}
+                          className="save-btn"
+                          onClick={() => handleUpdateItem(item.id)}
                         >
-                          編集
+                          保存
                         </button>
                         <button 
-                          className="delete-btn"
-                          onClick={() => handleDeleteItem(item.id)}
+                          className="cancel-btn"
+                          onClick={cancelEdit}
                         >
-                          削除
+                          キャンセル
                         </button>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              
-              {getCurrentData().length === 0 && (
-                <div className="empty-state">
-                  まだアイテムがありません
-                </div>
-              )}
-            </div>
-          )}
+                    ) : (
+                      <div className="item-display">
+                        <span className="item-name">{item.name}</span>
+                        <div className="item-actions">
+                          <button 
+                            className="edit-btn"
+                            onClick={() => startEdit(item)}
+                          >
+                            編集
+                          </button>
+                          <button 
+                            className="delete-btn"
+                            onClick={() => handleDeleteItem(item.id)}
+                          >
+                            削除
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {getCurrentData().length === 0 && (
+                  <div className="empty-state">
+                    まだアイテムがありません
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
