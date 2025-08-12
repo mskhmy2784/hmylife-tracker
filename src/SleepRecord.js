@@ -1,8 +1,10 @@
+import { useAuth } from './contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
 function SleepRecord({ onBack, onSave, editingRecord }) {
+  const { currentUser } = useAuth();
   const [wakeTime, setWakeTime] = useState(() => {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -160,6 +162,7 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
     try {
       const sleepData = {
         category: '睡眠',
+        userID: currentUser.uid,
         wakeTime: wakeTime,
         sleepTime: sleepTime,
         sleepHours: sleepDuration.hours,
