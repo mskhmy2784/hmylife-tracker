@@ -1,3 +1,4 @@
+import { useAuth } from '../contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { 
@@ -12,6 +13,7 @@ import {
 } from 'firebase/firestore';
 
 function MealRecord({ onBack, onSave, editingRecord }) {
+  const { currentUser } = useAuth();
   const [recordTime, setRecordTime] = useState(() => {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -198,6 +200,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
       
       const mealData = {
         category: '食事',
+        userId: currentUser.uid, // ← この行を追加
         recordTime: recordTime,
         mealType: mealType,
         calories: finalCalories,
