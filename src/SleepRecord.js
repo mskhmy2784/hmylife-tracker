@@ -13,6 +13,7 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
   const [sleepTime, setSleepTime] = useState('23:00');
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [memo, setMemo] = useState('');
+  const [errors, setErrors] = useState({});
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -53,8 +54,40 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
 
   const sleepDuration = calculateSleepDuration();
 
+  // バリデーション
+  const validateForm = () => {
+    const newErrors = {};
+
+    // 起床時刻チェック
+    if (!wakeTime) {
+      newErrors.wakeTime = '起床時刻を入力してください';
+    }
+
+    // 就寝時刻チェック
+    if (!sleepTime) {
+      newErrors.sleepTime = '就寝時刻を入力してください';
+    }
+
+    // 睡眠時間の妥当性チェック
+    if (wakeTime && sleepTime) {
+      if (sleepDuration.totalMinutes < 30) {
+        newErrors.duration = '睡眠時間が短すぎます（30分以上にしてください）';
+      } else if (sleepDuration.totalMinutes > 18 * 60) {
+        newErrors.duration = '睡眠時間が長すぎます（18時間以下にしてください）';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   // 保存処理
   const handleSave = async () => {
+    if (!validateForm()) {
+      alert('入力内容に不備があります。エラーメッセージを確認してください。');
+      return;
+    }
+
     try {
       const sleepData = {
         category: '睡眠',
@@ -112,31 +145,46 @@ function SleepRecord({ onBack, onSave, editingRecord }) {
       <div className="record-form">
         {/* 起床時刻 */}
         <div className="form-group">
-          <label>起床時刻:</label>
+          <label>起床時刻: <span className="required">*</span></label>
           <input
             type="time"
             value={wakeTime}
-            onChange={(e) => setWakeTime(e.target.value)}
+            onChange={(e) => {
+              setWakeTime(e.target.value);
+              if (errors.wakeTime || errors.duration) {
+                setErrors({...errors, wakeTime: '', duration: ''});
+              }
+            }}
+            className={errors.wakeTime ? 'error' : ''}
           />
+          {errors.wakeTime && <span className="error-message">{errors.wakeTime}</span>}
         </div>
 
         {/* 就寝時刻 */}
         <div className="form-group">
-          <label>就寝時刻:</label>
+          <label>就寝時刻: <span className="required">*</span></label>
           <input
             type="time"
             value={sleepTime}
-            onChange={(e) => setSleepTime(e.target.value)}
+            onChange={(e) => {
+              setSleepTime(e.target.value);
+              if (errors.sleepTime || errors.duration) {
+                setErrors({...errors, sleepTime: '', duration: ''});
+              }
+            }}
+            className={errors.sleepTime ? 'error' : ''}
           />
           <div className="sleep-note">前日の就寝時刻</div>
+          {errors.sleepTime && <span className="error-message">{errors.sleepTime}</span>}
         </div>
 
         {/* 睡眠時間（自動計算） */}
         <div className="form-group">
           <label>睡眠時間:</label>
-          <div className="sleep-duration">
+          <div className={`sleep-duration ${errors.duration ? 'error' : ''}`}>
             {sleepDuration.text}
           </div>
+          {errors.duration && <span className="error-message">{errors.duration}</span>}
         </div>
 
         {/* 位置情報・メモ */}

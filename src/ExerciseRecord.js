@@ -22,6 +22,7 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
   const [isCustomExerciseLocation, setIsCustomExerciseLocation] = useState(false);
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [memo, setMemo] = useState('');
+  const [errors, setErrors] = useState({});
 
   // 運動種類のマスタデータ（今後はFirestoreから取得）
   const exerciseTypes = [
@@ -64,8 +65,68 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
     }
   }, [editingRecord]);
 
+  // バリデーション
+  const validateForm = () => {
+    const newErrors = {};
+
+    // 運動内容チェック（必須）
+    if (!exerciseContent.trim()) {
+      newErrors.exerciseContent = '運動内容を入力してください';
+    }
+
+    // 数値の妥当性チェック（負の値禁止）
+    if (caloriesBurned && parseInt(caloriesBurned) < 0) {
+      newErrors.caloriesBurned = '消費カロリーは0以上で入力してください';
+    }
+
+    if (duration && parseInt(duration) < 0) {
+      newErrors.duration = '運動時間は0以上で入力してください';
+    }
+
+    if (distance && parseFloat(distance) < 0) {
+      newErrors.distance = '距離は0以上で入力してください';
+    }
+
+    if (weight && parseFloat(weight) < 0) {
+      newErrors.weight = '重量は0以上で入力してください';
+    }
+
+    if (reps && parseInt(reps) < 0) {
+      newErrors.reps = '回数は0以上で入力してください';
+    }
+
+    // 数値の上限チェック
+    if (caloriesBurned && parseInt(caloriesBurned) > 10000) {
+      newErrors.caloriesBurned = '消費カロリーは10000kcal以下で入力してください';
+    }
+
+    if (duration && parseInt(duration) > 1440) {
+      newErrors.duration = '運動時間は1440分(24時間)以下で入力してください';
+    }
+
+    if (distance && parseFloat(distance) > 1000) {
+      newErrors.distance = '距離は1000km以下で入力してください';
+    }
+
+    if (weight && parseFloat(weight) > 1000) {
+      newErrors.weight = '重量は1000kg以下で入力してください';
+    }
+
+    if (reps && parseInt(reps) > 10000) {
+      newErrors.reps = '回数は10000回以下で入力してください';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   // 保存処理
   const handleSave = async () => {
+    if (!validateForm()) {
+      alert('入力内容に不備があります。エラーメッセージを確認してください。');
+      return;
+    }
+
     try {
       const exerciseData = {
         category: '運動',
@@ -150,13 +211,20 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
 
         {/* 運動内容 */}
         <div className="form-group">
-          <label>運動内容:</label>
+          <label>運動内容: <span className="required">*</span></label>
           <textarea
             value={exerciseContent}
-            onChange={(e) => setExerciseContent(e.target.value)}
+            onChange={(e) => {
+              setExerciseContent(e.target.value);
+              if (errors.exerciseContent) {
+                setErrors({...errors, exerciseContent: ''});
+              }
+            }}
             placeholder="具体的な運動内容"
             rows="3"
+            className={errors.exerciseContent ? 'error' : ''}
           />
+          {errors.exerciseContent && <span className="error-message">{errors.exerciseContent}</span>}
         </div>
 
         {/* 運動データ */}
@@ -169,9 +237,18 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
               <input
                 type="number"
                 value={caloriesBurned}
-                onChange={(e) => setCaloriesBurned(e.target.value)}
+                onChange={(e) => {
+                  setCaloriesBurned(e.target.value);
+                  if (errors.caloriesBurned) {
+                    setErrors({...errors, caloriesBurned: ''});
+                  }
+                }}
                 placeholder="kcal"
+                min="0"
+                max="10000"
+                className={errors.caloriesBurned ? 'error' : ''}
               />
+              {errors.caloriesBurned && <span className="error-message">{errors.caloriesBurned}</span>}
             </div>
             
             <div className="data-item">
@@ -179,9 +256,18 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
               <input
                 type="number"
                 value={duration}
-                onChange={(e) => setDuration(e.target.value)}
+                onChange={(e) => {
+                  setDuration(e.target.value);
+                  if (errors.duration) {
+                    setErrors({...errors, duration: ''});
+                  }
+                }}
                 placeholder="分"
+                min="0"
+                max="1440"
+                className={errors.duration ? 'error' : ''}
               />
+              {errors.duration && <span className="error-message">{errors.duration}</span>}
             </div>
             
             <div className="data-item">
@@ -190,9 +276,18 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
                 type="number"
                 step="0.1"
                 value={distance}
-                onChange={(e) => setDistance(e.target.value)}
+                onChange={(e) => {
+                  setDistance(e.target.value);
+                  if (errors.distance) {
+                    setErrors({...errors, distance: ''});
+                  }
+                }}
                 placeholder="km"
+                min="0"
+                max="1000"
+                className={errors.distance ? 'error' : ''}
               />
+              {errors.distance && <span className="error-message">{errors.distance}</span>}
             </div>
             
             <div className="data-item">
@@ -201,9 +296,18 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
                 type="number"
                 step="0.5"
                 value={weight}
-                onChange={(e) => setWeight(e.target.value)}
+                onChange={(e) => {
+                  setWeight(e.target.value);
+                  if (errors.weight) {
+                    setErrors({...errors, weight: ''});
+                  }
+                }}
                 placeholder="kg"
+                min="0"
+                max="1000"
+                className={errors.weight ? 'error' : ''}
               />
+              {errors.weight && <span className="error-message">{errors.weight}</span>}
             </div>
             
             <div className="data-item">
@@ -211,9 +315,18 @@ function ExerciseRecord({ onBack, onSave, editingRecord }) {
               <input
                 type="number"
                 value={reps}
-                onChange={(e) => setReps(e.target.value)}
+                onChange={(e) => {
+                  setReps(e.target.value);
+                  if (errors.reps) {
+                    setErrors({...errors, reps: ''});
+                  }
+                }}
                 placeholder="回"
+                min="0"
+                max="10000"
+                className={errors.reps ? 'error' : ''}
               />
+              {errors.reps && <span className="error-message">{errors.reps}</span>}
             </div>
           </div>
         </div>

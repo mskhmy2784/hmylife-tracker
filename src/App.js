@@ -232,7 +232,18 @@ function App() {
         icon = '📝';
         const priorityIcon = record.priority === '重要' ? '🔴' : record.priority === '低' ? '🟢' : '🟡';
         const typeText = record.infoType;
-        const completionText = record.infoType === 'TODO' && record.isCompleted ? ' ✅' : '';
+        
+        // TODOの完了状況をより明確に表示
+        let completionStatus = '';
+        if (record.infoType === 'TODO') {
+          if (record.isCompleted) {
+            completionStatus = ' ✅完了';
+            icon = '✅'; // TODOが完了している場合はアイコンも変更
+          } else {
+            completionStatus = ' ⏳未完了';
+          }
+        }
+        
         const dueDateText = record.dueDate ? ` (${record.dueDate}期限)` : '';
         
         // 情報内容の最初の50文字のみ表示
@@ -240,7 +251,7 @@ function App() {
           record.infoContent.substring(0, 50) + '...' : 
           record.infoContent;
         
-        content = `${priorityIcon} [${typeText}] ${shortContent}${dueDateText}${completionText}`;
+        content = `${priorityIcon} [${typeText}] ${shortContent}${dueDateText}${completionStatus}`;
         break;
       // 今後他のカテゴリも追加
       default:

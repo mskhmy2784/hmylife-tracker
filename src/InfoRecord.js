@@ -18,6 +18,7 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
   const [isCompleted, setIsCompleted] = useState(false);
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [memo, setMemo] = useState('');
+  const [errors, setErrors] = useState({});
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -34,8 +35,51 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
     }
   }, [editingRecord]);
 
+  // バリデーション
+  const validateForm = () => {
+    const newErrors = {};
+
+    // 情報内容チェック（必須）
+    if (!infoContent.trim()) {
+      newErrors.infoContent = '情報内容を入力してください';
+    }
+
+    // TODO期限の論理チェック
+    if (infoType === 'TODO' && dueDate) {
+      const today = new Date();
+      const selectedDate = new Date(dueDate);
+      
+      // 過去の日付チェック（当日は許可）
+      today.setHours(0, 0, 0, 0);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        newErrors.dueDate = '期限は今日以降の日付を設定してください';
+      }
+      
+      // 時刻が設定されている場合の詳細チェック
+      if (dueTime) {
+        const now = new Date();
+        const dueDatetime = new Date(dueDate + 'T' + dueTime);
+        
+        // 今日の日付で過去の時刻をチェック
+        if (selectedDate.getTime() === today.getTime() && dueDatetime < now) {
+          newErrors.dueTime = '今日の期限は現在時刻以降を設定してください';
+        }
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   // 保存処理
   const handleSave = async () => {
+    if (!validateForm()) {
+      alert('入力内容に不備があります。エラーメッセージを確認してください。');
+      return;
+    }
+
     try {
       const infoData = {
         category: '情報',
@@ -137,13 +181,20 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
 
         {/* 情報内容 */}
         <div className="form-group">
-          <label>情報内容:</label>
+          <label>情報内容: <span className="required">*</span></label>
           <textarea
             value={infoContent}
-            onChange={(e) => setInfoContent(e.target.value)}
+            onChange={(e) => {
+              setInfoContent(e.target.value);
+              if (errors.infoContent) {
+                setErrors({...errors, infoContent: ''});
+              }
+            }}
             placeholder="メモまたはTODOの内容"
             rows="4"
+            className={errors.infoContent ? 'error' : ''}
           />
+          {errors.infoContent && <span className="error-message">{errors.infoContent}</span>}
         </div>
 
         {/* TODO専用項目 */}
@@ -155,16 +206,30 @@ function InfoRecord({ onBack, onSave, editingRecord }) {
                 <input
                   type="date"
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  onChange={(e) => {
+                    setDueDate(e.target.value);
+                    if (errors.dueDate || errors.dueTime) {
+                      setErrors({...errors, dueDate: '', dueTime: ''});
+                    }
+                  }}
                   placeholder="日付 (任意)"
+                  className={errors.dueDate ? 'error' : ''}
                 />
                 <input
                   type="time"
                   value={dueTime}
-                  onChange={(e) => setDueTime(e.target.value)}
+                  onChange={(e) => {
+                    setDueTime(e.target.value);
+                    if (errors.dueTime) {
+                      setErrors({...errors, dueTime: ''});
+                    }
+                  }}
                   placeholder="時刻 (任意)"
+                  className={errors.dueTime ? 'error' : ''}
                 />
               </div>
+              {errors.dueDate && <span className="error-message">{errors.dueDate}</span>}
+              {errors.dueTime && <span className="error-message">{errors.dueTime}</span>}
             </div>
 
             <div className="form-group">

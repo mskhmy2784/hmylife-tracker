@@ -18,6 +18,7 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
   const [paymentMethod, setPaymentMethod] = useState('現金');
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [memo, setMemo] = useState('');
+  const [errors, setErrors] = useState({});
 
   // よく使う店舗のマスタデータ（今後はFirestoreから取得）
   const commonStores = [
@@ -46,15 +47,45 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
     }
   }, [editingRecord]);
 
+  // バリデーション
+  const validateForm = () => {
+    const newErrors = {};
+
+    // 支払先チェック
+    const finalPaymentLocation = isCustomPaymentLocation ? paymentLocationInput : paymentLocation;
+    if (!finalPaymentLocation.trim()) {
+      newErrors.paymentLocation = '支払先を入力してください';
+    }
+
+    // 支出内容チェック
+    if (!expenseContent.trim()) {
+      newErrors.expenseContent = '支出内容を入力してください';
+    }
+
+    // 金額チェック
+    const amountNum = parseInt(amount);
+    if (!amount || amountNum < 1) {
+      newErrors.amount = '金額は1円以上で入力してください';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   // 保存処理
   const handleSave = async () => {
+    if (!validateForm()) {
+      alert('入力内容に不備があります。エラーメッセージを確認してください。');
+      return;
+    }
+
     try {
       const expenseData = {
         category: '支出',
         recordTime: recordTime,
         paymentLocation: isCustomPaymentLocation ? paymentLocationInput : paymentLocation,
         expenseContent: expenseContent,
-        amount: parseInt(amount) || 0,
+        amount: parseInt(amount),
         paymentMethod: paymentMethod,
         useLocationInfo: useLocationInfo,
         memo: memo,
@@ -115,7 +146,7 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
 
         {/* 支払先 */}
         <div className="form-group">
-          <label>支払先:</label>
+          <label>支払先: <span className="required">*</span></label>
           <div className="store-selection">
             <select
               value={isCustomPaymentLocation ? 'custom' : paymentLocation}
@@ -127,7 +158,11 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
                   setIsCustomPaymentLocation(false);
                   setPaymentLocation(e.target.value);
                 }
+                if (errors.paymentLocation) {
+                  setErrors({...errors, paymentLocation: ''});
+                }
               }}
+              className={errors.paymentLocation ? 'error' : ''}
             >
               <option value="">よく使う店舗を選択</option>
               {commonStores.map(store => (
@@ -140,34 +175,55 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
               <input
                 type="text"
                 value={paymentLocationInput}
-                onChange={(e) => setPaymentLocationInput(e.target.value)}
+                onChange={(e) => {
+                  setPaymentLocationInput(e.target.value);
+                  if (errors.paymentLocation) {
+                    setErrors({...errors, paymentLocation: ''});
+                  }
+                }}
                 placeholder="店舗名を入力"
-                className="custom-input"
+                className={`custom-input ${errors.paymentLocation ? 'error' : ''}`}
               />
             )}
           </div>
+          {errors.paymentLocation && <span className="error-message">{errors.paymentLocation}</span>}
         </div>
 
         {/* 支出内容 */}
         <div className="form-group">
-          <label>支出内容:</label>
+          <label>支出内容: <span className="required">*</span></label>
           <input
             type="text"
             value={expenseContent}
-            onChange={(e) => setExpenseContent(e.target.value)}
+            onChange={(e) => {
+              setExpenseContent(e.target.value);
+              if (errors.expenseContent) {
+                setErrors({...errors, expenseContent: ''});
+              }
+            }}
             placeholder="購入した商品・サービス"
+            className={errors.expenseContent ? 'error' : ''}
           />
+          {errors.expenseContent && <span className="error-message">{errors.expenseContent}</span>}
         </div>
 
         {/* 金額 */}
         <div className="form-group">
-          <label>金額:</label>
+          <label>金額: <span className="required">*</span></label>
           <input
             type="number"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              if (errors.amount) {
+                setErrors({...errors, amount: ''});
+              }
+            }}
             placeholder="円"
+            min="1"
+            className={errors.amount ? 'error' : ''}
           />
+          {errors.amount && <span className="error-message">{errors.amount}</span>}
         </div>
 
         {/* 支払方法 */}
