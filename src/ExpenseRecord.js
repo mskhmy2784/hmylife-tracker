@@ -89,12 +89,12 @@ function ExpenseRecord({ onBack, onSave, editingRecord }) {
       setIsCustomPaymentLocation(false);
       setExpenseContent(editingRecord.expenseContent || '');
       setAmount(editingRecord.amount ? editingRecord.amount.toString() : '');
-      setPaymentMethod(editingRecord.paymentMethod || '現金');
+      setPaymentMethod(editingRecord.paymentMethod || (paymentMethods.length > 0 ? paymentMethods[0] : '現金'));
       setUseLocationInfo(editingRecord.useLocationInfo !== false);
       setMemo(editingRecord.memo || '');
       setPhotos(editingRecord.photos || []); // 既存の写真を読み込み
     }
-  }, [editingRecord]);
+  }, [editingRecord, paymentMethods]);
 
   // 写真撮影・選択処理
   const handlePhotoCapture = async (event) => {
