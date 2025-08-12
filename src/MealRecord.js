@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  orderBy, 
+  onSnapshot 
+} from 'firebase/firestore';
 
 function MealRecord({ onBack, onSave, editingRecord }) {
   const [recordTime, setRecordTime] = useState(() => {
@@ -10,10 +19,10 @@ function MealRecord({ onBack, onSave, editingRecord }) {
     return `${hours}:${minutes}`;
   });
   
-  const [mealType, setMealType] = useState('昼食');
+  const [mealType, setMealType] = useState('');
   const [calories, setCalories] = useState('');
   const [useDefault, setUseDefault] = useState(false);
-  const [mealContent, setMealContent] = useState('');  // 必須制約削除
+  const [mealContent, setMealContent] = useState('');
   const [isExternalMeal, setIsExternalMeal] = useState(false);
   const [paymentLocation, setPaymentLocation] = useState('');
   const [paymentLocationInput, setPaymentLocationInput] = useState('');
@@ -23,8 +32,12 @@ function MealRecord({ onBack, onSave, editingRecord }) {
   const [useLocationInfo, setUseLocationInfo] = useState(true);
   const [memo, setMemo] = useState('');
 
-  // よく使う店舗のマスタデータ（今後はFirestoreから取得）
-  const commonStores = [
+  // マスタデータ
+  const [masterStores, setMasterStores] = useState([]);
+  const [loadingMasterData, setLoadingMasterData] = useState(true);
+
+  // フォールバック用の店舗データ
+  const fallbackStores = [
     'ファミリーマート',
     'セブンイレブン', 
     'ローソン',
@@ -33,6 +46,63 @@ function MealRecord({ onBack, onSave, editingRecord }) {
     '吉野家',
     'すき家'
   ];
+
+  // 時間に応じた食事種別の自動判定
+  const determineMealTypeByTime = (timeString) => {
+    const [hours] = timeString.split(':').map(Number);
+    
+    if (hours >= 5 && hours < 10) {
+      return '朝食';
+    } else if (hours >= 11 && hours < 15) {
+      return '昼食';
+    } else if (hours >= 17 && hours < 22) {
+      return '夕食';
+    } else {
+      return '間食';
+    }
+  };
+
+  // マスタデータ読み込み
+  useEffect(() => {
+    const q = query(
+      collection(db, 'master_stores'),
+      orderBy('order', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(q, 
+      (querySnapshot) => {
+        const stores = [];
+        querySnapshot.forEach((doc) => {
+          stores.push({ id: doc.id, ...doc.data() });
+        });
+        setMasterStores(stores);
+        setLoadingMasterData(false);
+      },
+      (error) => {
+        console.error('マスタデータ取得エラー:', error);
+        setLoadingMasterData(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // 初期表示時の食事種別設定
+  useEffect(() => {
+    if (!editingRecord && !mealType) {
+      const determinedMealType = determineMealTypeByTime(recordTime);
+      setMealType(determinedMealType);
+    }
+  }, [recordTime, editingRecord, mealType]);
+
+  // 記録時刻変更時の食事種別自動更新（編集時以外）
+  const handleTimeChange = (newTime) => {
+    setRecordTime(newTime);
+    if (!editingRecord) {
+      const determinedMealType = determineMealTypeByTime(newTime);
+      setMealType(determinedMealType);
+    }
+  };
 
   // 編集時のデータ初期化
   useEffect(() => {
@@ -71,7 +141,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
         recordTime: recordTime,
         mealType: mealType,
         calories: finalCalories,
-        mealContent: mealContent || '',  // 空文字列でも保存可能
+        mealContent: mealContent || '',
         isExternalMeal: isExternalMeal,
         paymentLocation: isExternalMeal ? (isCustomPaymentLocation ? paymentLocationInput : paymentLocation) : '',
         amount: isExternalMeal ? parseInt(amount) || 0 : 0,
@@ -109,6 +179,16 @@ function MealRecord({ onBack, onSave, editingRecord }) {
     }
   };
 
+  // 使用する店舗データを決定
+  const getStoreOptions = () => {
+    if (masterStores.length > 0) {
+      return masterStores.map(store => store.name);
+    }
+    return fallbackStores;
+  };
+
+  const storeOptions = getStoreOptions();
+
   return (
     <div className="record-screen">
       <div className="record-header">
@@ -124,8 +204,13 @@ function MealRecord({ onBack, onSave, editingRecord }) {
           <input
             type="time"
             value={recordTime}
-            onChange={(e) => setRecordTime(e.target.value)}
+            onChange={(e) => handleTimeChange(e.target.value)}
           />
+          {!editingRecord && (
+            <div className="time-hint">
+              💡 時刻に応じて食事種別が自動設定されます
+            </div>
+          )}
         </div>
 
         {/* 食事種別 */}
@@ -167,7 +252,7 @@ function MealRecord({ onBack, onSave, editingRecord }) {
           </div>
         </div>
 
-        {/* 食事内容 - 必須制約削除 */}
+        {/* 食事内容 */}
         <div className="form-group">
           <label>食事内容 (任意):</label>
           <textarea
@@ -196,36 +281,42 @@ function MealRecord({ onBack, onSave, editingRecord }) {
             <div className="external-meal-info">
               <div className="form-group">
                 <label>支払先:</label>
-                <div className="store-selection">
-                  <select
-                    value={isCustomPaymentLocation ? 'custom' : paymentLocation}
-                    onChange={(e) => {
-                      if (e.target.value === 'custom') {
-                        setIsCustomPaymentLocation(true);
-                        setPaymentLocation('');
-                      } else {
-                        setIsCustomPaymentLocation(false);
-                        setPaymentLocation(e.target.value);
-                      }
-                    }}
-                  >
-                    <option value="">よく使う店舗を選択</option>
-                    {commonStores.map(store => (
-                      <option key={store} value={store}>{store}</option>
-                    ))}
-                    <option value="custom">手入力で追加</option>
-                  </select>
-                  
-                  {isCustomPaymentLocation && (
-                    <input
-                      type="text"
-                      value={paymentLocationInput}
-                      onChange={(e) => setPaymentLocationInput(e.target.value)}
-                      placeholder="店舗名を入力"
-                      className="custom-input"
-                    />
-                  )}
-                </div>
+                {loadingMasterData ? (
+                  <div className="loading-text">マスタデータ読み込み中...</div>
+                ) : (
+                  <div className="store-selection">
+                    <select
+                      value={isCustomPaymentLocation ? 'custom' : paymentLocation}
+                      onChange={(e) => {
+                        if (e.target.value === 'custom') {
+                          setIsCustomPaymentLocation(true);
+                          setPaymentLocation('');
+                        } else {
+                          setIsCustomPaymentLocation(false);
+                          setPaymentLocation(e.target.value);
+                        }
+                      }}
+                    >
+                      <option value="">
+                        {masterStores.length > 0 ? '登録された店舗を選択' : 'よく使う店舗を選択'}
+                      </option>
+                      {storeOptions.map(store => (
+                        <option key={store} value={store}>{store}</option>
+                      ))}
+                      <option value="custom">手入力で追加</option>
+                    </select>
+                    
+                    {isCustomPaymentLocation && (
+                      <input
+                        type="text"
+                        value={paymentLocationInput}
+                        onChange={(e) => setPaymentLocationInput(e.target.value)}
+                        placeholder="店舗名を入力"
+                        className="custom-input"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label>金額:</label>
