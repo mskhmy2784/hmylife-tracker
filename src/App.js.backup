@@ -1,0 +1,25 @@
+// src/App.js
+import React from 'react';
+
+function App() {
+  return (
+    <div style={{ 
+      padding: '20px', 
+      fontFamily: 'Arial, sans-serif',
+      textAlign: 'center'
+    }}>
+      <h1>🏃‍♂️ HMYLifeLog</h1>
+      <p>新しいアーキテクチャでの動作確認中...</p>
+      <div style={{
+        background: '#f0f8ff',
+        padding: '20px',
+        borderRadius: '8px',
+        margin: '20px 0'
+      }}>
+        ✅ React アプリケーションが正常に起動しました！
+      </div>
+    </div>
+  );
+}
+
+export default App;
